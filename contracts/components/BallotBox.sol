@@ -5,6 +5,7 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
+import "../interface/IShareToken.sol";
 import "../interface/ITimeLock.sol";
 import "./Delegate.sol";
 import "./Signature.sol";
@@ -134,13 +135,13 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
         return 17280;
     } // ~3 days in blocks (assuming 15s blocks)
 
-    function getPriorVotes(address account, uint256 blockNumber)
-        public
-        view
-        virtual
-        returns (uint256)
-    {
+    function getPriorVotes(address account, uint256) public view virtual returns (uint256) {
         return getVoteBalance(account);
+    }
+
+    function getPriorThreshold(uint256) public view virtual returns (uint256) {
+        uint256 effectiveTotalSupply = IShareToken(_shareToken).totalSupply();
+        return effectiveTotalSupply.mul(proposalThreshold()).div(1e18);
     }
 
     function propose(
@@ -151,7 +152,7 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
         string memory description
     ) public returns (uint256) {
         require(
-            getPriorVotes(msg.sender, block.number.sub(1)) > proposalThreshold(),
+            getPriorVotes(msg.sender, block.number.sub(1)) > getPriorThreshold(block.number.sub(1)),
             "proposer votes below proposal threshold"
         );
         require(
@@ -190,6 +191,8 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
         proposals[proposalId].startBlock = startBlock;
         proposals[proposalId].endBlock = endBlock;
         latestProposalIds[msg.sender] = proposalId;
+
+        _castVote(msg.sender, proposalId, true);
 
         emit ProposalCreated(
             proposalId,
@@ -261,13 +264,13 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
     }
 
     function cancel(uint256 proposalId) public {
-        ProposalState state = state(proposalId);
-        require(state != ProposalState.Executed, "cannot cancel executed proposal");
+        require(state(proposalId) != ProposalState.Executed, "cannot cancel executed proposal");
 
         Proposal storage proposal = proposals[proposalId];
         require(
             msg.sender == guardian ||
-                getPriorVotes(proposal.proposer, block.number.sub(1)) < proposalThreshold(),
+                getPriorVotes(msg.sender, block.number.sub(1)) <
+                getPriorThreshold(block.number.sub(1)),
             "proposer above threshold"
         );
 
@@ -328,7 +331,7 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
         }
     }
 
-    function getQuorumVotes(uint256 proposalId) public view virtual returns (uint256) {
+    function getQuorumVotes(uint256) public view virtual returns (uint256) {
         return quorumVotes();
     }
 

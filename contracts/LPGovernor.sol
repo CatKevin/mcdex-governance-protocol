@@ -42,7 +42,7 @@ contract LPGovernor is Initializable, ShareBank, Mining, LockableBallotBox {
         return 2e17; // 20%
     }
 
-    function isCriticalFunction(string memory functionSignature) public view returns (bool) {
+    function isCriticalFunction(string memory functionSignature) public pure returns (bool) {
         bytes32 functionHash = keccak256(bytes(functionSignature));
         return
             functionHash == SIGNATURE_PERPETUAL_UPGRADE ||
@@ -61,16 +61,6 @@ contract LPGovernor is Initializable, ShareBank, Mining, LockableBallotBox {
         }
         return quorumVotes();
     }
-
-    // function getPriorVotes(address account, uint256 blockNumber)
-    //     public
-    //     view
-    //     virtual
-    //     override(Delegate, Delegate)
-    //     returns (uint256)
-    // {
-    //     return Delegate.getPriorVotes(account, blockNumber);
-    // }
 
     function stake(uint256 amount)
         public

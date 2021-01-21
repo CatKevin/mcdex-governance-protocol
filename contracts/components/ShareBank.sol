@@ -10,7 +10,7 @@ contract ShareBank is Initializable {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    IERC20Upgradeable internal _shareToken;
+    address internal _shareToken;
     uint256 internal _totalSupply;
     mapping(address => uint256) internal _balances;
 
@@ -22,11 +22,11 @@ contract ShareBank is Initializable {
     }
 
     function __Bank_init_unchained(address shareToken_) internal initializer {
-        _shareToken = IERC20Upgradeable(shareToken_);
+        _shareToken = shareToken_;
     }
 
     function shareToken() public view returns (address) {
-        return address(_shareToken);
+        return _shareToken;
     }
 
     function totalSupply() public view virtual returns (uint256) {
@@ -39,9 +39,9 @@ contract ShareBank is Initializable {
 
     function stake(uint256 amount) public virtual {
         require(amount > 0, "cannot stake zero amount");
+        IERC20Upgradeable(_shareToken).safeTransferFrom(msg.sender, address(this), amount);
         _totalSupply = _totalSupply.add(amount);
         _balances[msg.sender] = _balances[msg.sender].add(amount);
-        _shareToken.safeTransferFrom(msg.sender, address(this), amount);
         emit Stake(msg.sender, amount);
     }
 
@@ -50,6 +50,7 @@ contract ShareBank is Initializable {
         require(amount <= _balances[msg.sender], "insufficient balance");
         _totalSupply = _totalSupply.sub(amount);
         _balances[msg.sender] = _balances[msg.sender].sub(amount);
+        IERC20Upgradeable(_shareToken).safeTransferFrom(address(this), msg.sender, amount);
         emit Withdraw(msg.sender, amount);
     }
 }

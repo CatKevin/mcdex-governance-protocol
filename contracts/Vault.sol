@@ -35,6 +35,8 @@ contract Vault {
         uint256 devReceivedAmount
     );
 
+    event SetDev(address indexed devOld, address indexed devNew);
+
     // constructor(uint256 startTime) public {
     //     _startTime = startTime;
     //     _mintedMCB = _mcbToken.totalSupply();
@@ -42,6 +44,8 @@ contract Vault {
 
     function setDev(address dev) public {
         require(msg.sender == dev, "caller must be dev");
+        emit SetDev(_dev, dev);
+        _dev = dev;
     }
 
     function mintMCB(address recipient, uint256 amount) public {

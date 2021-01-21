@@ -36,7 +36,7 @@ contract Dividends is RewardDistribution {
         periodStart = beginBlock;
         periodFinish = endBlock;
         uint256 period = periodFinish.sub(periodStart);
-        uint256 rewardRate = reward.div(period);
+        rewardRate = reward.div(period);
         emit RewardAdded(reward);
     }
 

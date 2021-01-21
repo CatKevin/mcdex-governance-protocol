@@ -84,7 +84,7 @@ abstract contract LockableBallotBox is BallotBox {
                 state == ProposalState.Executed ||
                 state == ProposalState.Queued
             ) {
-                uint256 unlockBlock = proposals[proposalId].endBlock.add(_delayAfterSucceeded);
+                unlockBlock = proposals[proposalId].endBlock.add(_delayAfterSucceeded);
                 if (unlockBlock > unlockBlocks[voter]) {
                     unlockBlocks[voter] = unlockBlock;
                 }
