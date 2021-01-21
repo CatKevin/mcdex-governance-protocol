@@ -30,4 +30,8 @@ interface IShareToken {
     function mint(address account, uint256 amount) external;
 
     function burn(address account, uint256 amount) external;
+
+    function getTotalSupplyAt(uint256 blockNumber) external view returns (uint256);
+
+    function getBalanceAt(address account, uint256 blockNumber) external view returns (uint256);
 }

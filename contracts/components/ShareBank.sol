@@ -4,27 +4,36 @@ pragma solidity 0.7.4;
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-contract Stakeable {
+contract ShareBank is Initializable {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    IERC20Upgradeable public token;
+    IERC20Upgradeable internal _shareToken;
     uint256 internal _totalSupply;
     mapping(address => uint256) internal _balances;
 
     event Stake(address indexed account, uint256 amount);
     event Withdraw(address indexed account, uint256 amount);
 
-    function initialize(address tokenAddress) internal {
-        token = IERC20Upgradeable(tokenAddress);
+    function __Bank_init(address shareToken_) internal initializer {
+        __Bank_init_unchained(shareToken_);
     }
 
-    function totalSupply() public view returns (uint256) {
+    function __Bank_init_unchained(address shareToken_) internal initializer {
+        _shareToken = IERC20Upgradeable(shareToken_);
+    }
+
+    function shareToken() public view returns (address) {
+        return address(_shareToken);
+    }
+
+    function totalSupply() public view virtual returns (uint256) {
         return _totalSupply;
     }
 
-    function balanceOf(address account) public view returns (uint256) {
+    function balanceOf(address account) public view virtual returns (uint256) {
         return _balances[account];
     }
 
@@ -32,7 +41,7 @@ contract Stakeable {
         require(amount > 0, "cannot stake zero amount");
         _totalSupply = _totalSupply.add(amount);
         _balances[msg.sender] = _balances[msg.sender].add(amount);
-        token.safeTransferFrom(msg.sender, address(this), amount);
+        _shareToken.safeTransferFrom(msg.sender, address(this), amount);
         emit Stake(msg.sender, amount);
     }
 
@@ -41,7 +50,6 @@ contract Stakeable {
         require(amount <= _balances[msg.sender], "insufficient balance");
         _totalSupply = _totalSupply.sub(amount);
         _balances[msg.sender] = _balances[msg.sender].sub(amount);
-        token.safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, amount);
     }
 }
