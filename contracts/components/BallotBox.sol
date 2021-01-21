@@ -135,6 +135,14 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
         return 17280;
     } // ~3 days in blocks (assuming 15s blocks)
 
+    function gracePeriod() public pure returns (uint256) {
+        return 11520;
+    } // ~3 days in blocks (assuming 15s blocks)
+
+    function unlockPeriod() public pure returns (uint256) {
+        return 17280;
+    } // ~3 days in blocks (assuming 15s blocks)
+
     function getPriorVotes(address account, uint256) public view virtual returns (uint256) {
         return getVoteBalance(account);
     }

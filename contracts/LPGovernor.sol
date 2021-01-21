@@ -7,7 +7,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "./interface/ILPGovernor.sol";
 import "./components/ShareBank.sol";
 import "./components/Mining.sol";
-import "./components/LockableBallotBox.sol";
+import "./components/SnapshotLockableBallotBox.sol";
 
 /*
     LPGovernor:
@@ -17,7 +17,7 @@ import "./components/LockableBallotBox.sol";
         - propose/vote      √
 */
 
-contract LPGovernor is Initializable, ShareBank, Mining, LockableBallotBox {
+contract LPGovernor is Initializable, ShareBank, Mining, SnapshotLockableBallotBox {
     bytes32 public constant SIGNATURE_PERPETUAL_UPGRADE =
         keccak256(bytes("upgradeTo(address,address)"));
     bytes32 public constant SIGNATURE_PERPETUAL_SETTLE =
@@ -26,17 +26,20 @@ contract LPGovernor is Initializable, ShareBank, Mining, LockableBallotBox {
         keccak256(bytes("setOperator(address)"));
     address public liquidityPool;
 
-    function __LPGovernor_init(
+    function initialize(
         address shareToken_,
+        address rewardToken_,
         address timelock_,
         address guardian_
-    ) internal initializer {
-        __BallotBox_init_unchained(timelock_, guardian_);
-        __LPGovernor_init_unchained(shareToken_);
+    ) public initializer {
+        __Ownable_init_unchained();
         __Bank_init_unchained(shareToken_);
+        __RewardDistribution_init_unchained(rewardToken_);
+        __Mining_init_unchained();
+        __BallotBox_init_unchained(timelock_, guardian_);
+        __ShareLock_init_unchained();
+        __SnapshotLockableBallotBox_init_unchained();
     }
-
-    function __LPGovernor_init_unchained(address shareToken_) internal initializer {}
 
     function criticalQuorumVotes() public pure returns (uint256) {
         return 2e17; // 20%

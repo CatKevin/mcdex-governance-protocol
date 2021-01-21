@@ -13,21 +13,10 @@ abstract contract LockableBallotBox is BallotBox {
     mapping(address => uint256) public unlockBlocks;
     mapping(address => EnumerableSet.UintSet) internal _votedProposals;
 
-    uint256 internal _delayAfterSucceeded;
-
-    function __ShareLock_init(uint256 executionDelay, uint256 unlockDelay) internal initializer {
-        __ShareLock_init_unchained(executionDelay, unlockDelay);
-    }
-
-    function __ShareLock_init_unchained(uint256 executionDelay, uint256 unlockDelay)
-        internal
-        initializer
-    {
-        _delayAfterSucceeded = executionDelay.add(unlockDelay);
-    }
+    function __ShareLock_init_unchained() internal initializer {}
 
     function delayAfterSucceeded() public view returns (uint256) {
-        return _delayAfterSucceeded;
+        return gracePeriod().add(unlockPeriod());
     }
 
     function isLocked(address voter) public returns (bool) {
@@ -84,7 +73,7 @@ abstract contract LockableBallotBox is BallotBox {
                 state == ProposalState.Executed ||
                 state == ProposalState.Queued
             ) {
-                unlockBlock = proposals[proposalId].endBlock.add(_delayAfterSucceeded);
+                unlockBlock = proposals[proposalId].endBlock.add(delayAfterSucceeded());
                 if (unlockBlock > unlockBlocks[voter]) {
                     unlockBlocks[voter] = unlockBlock;
                 }

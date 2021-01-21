@@ -7,8 +7,10 @@ import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
 import "./LockableBallotBox.sol";
 
-abstract contract SnapshotBallotBox is LockableBallotBox {
+abstract contract SnapshotLockableBallotBox is LockableBallotBox {
     using SafeMathUpgradeable for uint256;
+
+    function __SnapshotLockableBallotBox_init_unchained() internal initializer {}
 
     function getPriorVotes(address account, uint256 blockNumber)
         public

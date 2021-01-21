@@ -23,9 +23,9 @@ contract RewardDistribution is ShareBank, OwnableUpgradeable {
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
 
-    event RewardAdded(uint256 reward);
-    event RewardRateChanged(uint256 previousRate, uint256 currentRate);
     event RewardPaid(address indexed user, uint256 reward);
+    event RewardAdded(uint256 reward, uint256 periodFinish);
+    event RewardRateChanged(uint256 previousRate, uint256 currentRate, uint256 periodFinish);
 
     modifier onlyRewardDistribution() {
         require(_msgSender() == rewardDistribution, "Caller is not reward distribution");

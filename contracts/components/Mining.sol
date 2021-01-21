@@ -30,7 +30,7 @@ contract Mining is RewardDistribution {
                 block.number
             );
         }
-        emit RewardRateChanged(rewardRate, newRewardRate);
+        emit RewardRateChanged(rewardRate, newRewardRate, periodFinish);
         rewardRate = newRewardRate;
     }
 
@@ -46,11 +46,11 @@ contract Mining is RewardDistribution {
         if (block.number > periodFinish) {
             lastUpdateTime = block.number;
             periodFinish = block.number.add(period);
-            emit RewardAdded(reward);
+            emit RewardAdded(reward, periodFinish);
         } else {
             // not finished or not initialized
             periodFinish = periodFinish.add(period);
-            emit RewardAdded(reward);
+            emit RewardAdded(reward, periodFinish);
         }
     }
 }

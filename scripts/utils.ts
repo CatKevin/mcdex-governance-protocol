@@ -24,6 +24,5 @@ export async function createFactory(path, libraries = {}) {
 
 export async function createContract(path, args = [], libraries = {}) {
     const factory = await createFactory(path, libraries);
-    const deployed = await factory.deploy(...args);
-    return deployed;
+    return await factory.deploy(...args);
 }

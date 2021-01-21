@@ -50,7 +50,7 @@ contract ShareBank is Initializable {
         require(amount <= _balances[msg.sender], "insufficient balance");
         _totalSupply = _totalSupply.sub(amount);
         _balances[msg.sender] = _balances[msg.sender].sub(amount);
-        IERC20Upgradeable(_shareToken).safeTransferFrom(address(this), msg.sender, amount);
+        IERC20Upgradeable(_shareToken).safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, amount);
     }
 }

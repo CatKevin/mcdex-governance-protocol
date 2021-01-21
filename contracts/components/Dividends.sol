@@ -37,7 +37,7 @@ contract Dividends is RewardDistribution {
         periodFinish = endBlock;
         uint256 period = periodFinish.sub(periodStart);
         rewardRate = reward.div(period);
-        emit RewardAdded(reward);
+        emit RewardAdded(reward, periodFinish);
     }
 
     function addReward(uint256 reward)
@@ -56,7 +56,7 @@ contract Dividends is RewardDistribution {
         uint256 newRewardRate =
             periodFinish.sub(lastUpdateTime).mul(rewardRate).add(reward).div(blockLeft);
         rewardRate = newRewardRate;
-        emit RewardAdded(reward);
-        emit RewardRateChanged(rewardRate, newRewardRate);
+        emit RewardAdded(reward, periodFinish);
+        emit RewardRateChanged(rewardRate, newRewardRate, periodFinish);
     }
 }
