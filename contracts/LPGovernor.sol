@@ -26,11 +26,6 @@ contract LPGovernor is Initializable, ShareBank, Mining, LockableBallotBox {
         keccak256(bytes("setOperator(address)"));
     address public liquidityPool;
 
-    modifier onlyUnlocked() {
-        require(!isLocked(msg.sender), "share locked by voting");
-        _;
-    }
-
     function __LPGovernor_init(
         address shareToken_,
         address timelock_,
@@ -83,16 +78,15 @@ contract LPGovernor is Initializable, ShareBank, Mining, LockableBallotBox {
         override(ShareBank, Delegate)
         updateReward(msg.sender)
     {
-        ShareBank.stake(amount);
+        super.stake(amount);
     }
 
     function withdraw(uint256 amount)
         public
         virtual
-        override(ShareBank, Delegate)
+        override(ShareBank, LockableBallotBox)
         updateReward(msg.sender)
-        onlyUnlocked
     {
-        ShareBank.withdraw(amount);
+        super.withdraw(amount);
     }
 }

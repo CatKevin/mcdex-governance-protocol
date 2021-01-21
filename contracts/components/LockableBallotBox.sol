@@ -35,6 +35,11 @@ abstract contract LockableBallotBox is BallotBox {
         return unlockBlocks[voter] > getBlockNumber();
     }
 
+    function withdraw(uint256 amount) public virtual override {
+        require(!isLocked(msg.sender), "share token is locked by voting");
+        super.withdraw(amount);
+    }
+
     // enum ProposalState {
     // ---------------------- ignore ----------------------
     //     Pending,         < startBlock

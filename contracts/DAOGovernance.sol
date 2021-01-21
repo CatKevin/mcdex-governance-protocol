@@ -19,18 +19,12 @@ import "./components/LockableBallotBox.sol";
         - valueCapture
 */
 
-contract DAOGovernance is Initializable, ShareBank, Dividends, LockableBallotBox {
-    modifier onlyUnlocked() {
-        require(!isLocked(msg.sender), "share locked by voting");
-        _;
-    }
-
+contract DAOGovernance is Initializable, Dividends, LockableBallotBox {
     function __DAOGovernance_init(
         address shareToken_,
         address timelock_,
         address guardian_
     ) internal initializer {
-        __Bank_init_unchained(shareToken_);
         __BallotBox_init_unchained(timelock_, guardian_);
         __DAOGovernance_init_unchained(shareToken_);
     }
@@ -53,16 +47,15 @@ contract DAOGovernance is Initializable, ShareBank, Dividends, LockableBallotBox
         override(ShareBank, Delegate)
         updateReward(msg.sender)
     {
-        ShareBank.stake(amount);
+        super.stake(amount);
     }
 
     function withdraw(uint256 amount)
         public
         virtual
-        override(ShareBank, Delegate)
+        override(ShareBank, LockableBallotBox)
         updateReward(msg.sender)
-        onlyUnlocked
     {
-        ShareBank.withdraw(amount);
+        super.withdraw(amount);
     }
 }
