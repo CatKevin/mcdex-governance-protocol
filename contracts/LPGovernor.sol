@@ -17,7 +17,7 @@ import "./components/SnapshotLockableBallotBox.sol";
         - propose/vote      √
 */
 
-contract LPGovernor is Initializable, ShareBank, Mining, SnapshotLockableBallotBox {
+contract LPGovernor is Initializable, Mining, SnapshotLockableBallotBox {
     bytes32 public constant SIGNATURE_PERPETUAL_UPGRADE =
         keccak256(bytes("upgradeTo(address,address)"));
     bytes32 public constant SIGNATURE_PERPETUAL_SETTLE =
@@ -68,18 +68,18 @@ contract LPGovernor is Initializable, ShareBank, Mining, SnapshotLockableBallotB
     function stake(uint256 amount)
         public
         virtual
-        override(ShareBank, Delegate)
+        override(ShareBank, SnapshotLockableBallotBox)
         updateReward(msg.sender)
     {
-        super.stake(amount);
+        SnapshotLockableBallotBox.stake(amount);
     }
 
     function withdraw(uint256 amount)
         public
         virtual
-        override(ShareBank, LockableBallotBox)
+        override(ShareBank, SnapshotLockableBallotBox)
         updateReward(msg.sender)
     {
-        super.withdraw(amount);
+        SnapshotLockableBallotBox.withdraw(amount);
     }
 }

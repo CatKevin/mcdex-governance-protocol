@@ -6,21 +6,17 @@ import "@openzeppelin/contracts-upgradeable/GSN/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
+import "../libraries/SnapshotOperation.sol";
+
+import "hardhat/console.sol";
+
 contract ShareToken is
     Initializable,
     ContextUpgradeable,
     AccessControlUpgradeable,
     ERC20Upgradeable
 {
-    struct Checkpoint {
-        uint256 fromBlock;
-        uint256 value;
-    }
-
-    struct Snapshot {
-        uint256 count;
-        mapping(uint256 => Checkpoint) checkpoints;
-    }
+    using SnapshotOperation for Snapshot;
 
     Snapshot internal _totalSupplySnapshot;
     mapping(address => Snapshot) internal _balanceSnapshot;
@@ -80,7 +76,7 @@ contract ShareToken is
     }
 
     function getTotalSupplyAt(uint256 blockNumber) public view virtual returns (uint256) {
-        return _findCheckpoint(_totalSupplySnapshot, blockNumber);
+        return _totalSupplySnapshot.findCheckpoint(blockNumber);
     }
 
     /**
@@ -96,7 +92,7 @@ contract ShareToken is
         virtual
         returns (uint256)
     {
-        return _findCheckpoint(_balanceSnapshot[account], blockNumber);
+        return _balanceSnapshot[account].findCheckpoint(blockNumber);
     }
 
     function mint(address account, uint256 amount) public virtual {
@@ -129,60 +125,14 @@ contract ShareToken is
             return;
         }
         uint256 balance = balanceOf(account);
-        _saveCheckpoint(_balanceSnapshot[account], balance);
+        _balanceSnapshot[account].saveCheckpoint(balance);
         emit SaveBalanceCheckpoint(account, balance);
     }
 
     function _saveTotalSupplyCheckpoint() internal {
         uint256 totalSupply_ = totalSupply();
-        _saveCheckpoint(_totalSupplySnapshot, totalSupply_);
+        _totalSupplySnapshot.saveCheckpoint(totalSupply_);
         emit SaveTotalSupplyCheckpoint(totalSupply_);
-    }
-
-    function _saveCheckpoint(Snapshot storage snapshot, uint256 newValue) internal {
-        uint256 blockNumber = block.number;
-        uint256 count = snapshot.count;
-        if (count > 0 && snapshot.checkpoints[count - 1].fromBlock == blockNumber) {
-            snapshot.checkpoints[count - 1].value = newValue;
-        } else {
-            snapshot.checkpoints[count].value = newValue;
-            snapshot.count = count + 1;
-        }
-    }
-
-    function _findCheckpoint(Snapshot storage snapshot, uint256 blockNumber)
-        internal
-        view
-        returns (uint256)
-    {
-        require(blockNumber < block.number, "not yet determined");
-        uint256 count = snapshot.count;
-        if (count == 0) {
-            return 0;
-        }
-
-        // First check most recent balance
-        if (snapshot.checkpoints[count - 1].fromBlock <= blockNumber) {
-            return snapshot.checkpoints[count - 1].value;
-        }
-        // Next check implicit zero balance
-        if (snapshot.checkpoints[0].fromBlock > blockNumber) {
-            return 0;
-        }
-        uint256 lower = 0;
-        uint256 upper = count - 1;
-        while (upper > lower) {
-            uint256 center = upper - (upper - lower) / 2; // ceil, avoiding overflow
-            Checkpoint memory cp = snapshot.checkpoints[center];
-            if (cp.fromBlock == blockNumber) {
-                return cp.value;
-            } else if (cp.fromBlock < blockNumber) {
-                lower = center;
-            } else {
-                upper = center - 1;
-            }
-        }
-        return snapshot.checkpoints[lower].value;
     }
 
     uint256[50] private __gap;

@@ -111,35 +111,35 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached
     ///         and for a vote to succeed
-    function quorumVotes() public pure returns (uint256) {
+    function quorumVotes() public pure virtual returns (uint256) {
         return 1e17;
-    } // 400,000 = 4% of Comp
+    } // 10%
 
     /// @notice The number of votes required in order for a voter to become a proposer
-    function proposalThreshold() public pure returns (uint256) {
-        return 100000e18;
-    } // 100,000 = 1% of Comp
+    function proposalThreshold() public pure virtual returns (uint256) {
+        return 1e16;
+    } // 1%
 
     /// @notice The maximum number of actions that can be included in a proposal
-    function proposalMaxOperations() public pure returns (uint256) {
+    function proposalMaxOperations() public pure virtual returns (uint256) {
         return 10;
     } // 10 actions
 
     /// @notice The delay before voting on a proposal may take place, once proposed
-    function votingDelay() public pure returns (uint256) {
+    function votingDelay() public pure virtual returns (uint256) {
         return 1;
     } // 1 block
 
     /// @notice The duration of voting on a proposal, in blocks
-    function votingPeriod() public pure returns (uint256) {
+    function votingPeriod() public pure virtual returns (uint256) {
         return 17280;
     } // ~3 days in blocks (assuming 15s blocks)
 
-    function gracePeriod() public pure returns (uint256) {
+    function gracePeriod() public pure virtual returns (uint256) {
         return 11520;
     } // ~3 days in blocks (assuming 15s blocks)
 
-    function unlockPeriod() public pure returns (uint256) {
+    function unlockPeriod() public pure virtual returns (uint256) {
         return 17280;
     } // ~3 days in blocks (assuming 15s blocks)
 
@@ -159,8 +159,9 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
         bytes[] memory calldatas,
         string memory description
     ) public returns (uint256) {
+        uint256 priorVotes = getPriorVotes(msg.sender, block.number.sub(1));
         require(
-            getPriorVotes(msg.sender, block.number.sub(1)) > getPriorThreshold(block.number.sub(1)),
+            priorVotes > getPriorThreshold(block.number.sub(1)),
             "proposer votes below proposal threshold"
         );
         require(
@@ -198,9 +199,13 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
         proposals[proposalId].calldatas = calldatas;
         proposals[proposalId].startBlock = startBlock;
         proposals[proposalId].endBlock = endBlock;
+        proposals[proposalId].forVotes = priorVotes;
+        proposals[proposalId].receipts[msg.sender] = Receipt({
+            hasVoted: true,
+            support: true,
+            votes: priorVotes
+        });
         latestProposalIds[msg.sender] = proposalId;
-
-        _castVote(msg.sender, proposalId, true);
 
         emit ProposalCreated(
             proposalId,
@@ -213,6 +218,7 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
             endBlock,
             description
         );
+        emit VoteCast(msg.sender, proposalId, true, priorVotes);
         return proposalId;
     }
 

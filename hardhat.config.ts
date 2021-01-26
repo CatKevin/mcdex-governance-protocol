@@ -78,9 +78,9 @@ task("call", "Call contract function")
         args.sig = args.sig.replace('function ', '')
         var iface = new hre.ethers.utils.Interface(["function " + args.sig])
         var selector = args.sig.slice(0, args.sig.indexOf('('))
-        // console.log(args.sig, args.args, selector)
+        console.log(args.sig, args.args, selector)
         var calldata = iface.encodeFunctionData(selector, args.args)
-        // console.log("encoded calldata", calldata)
+        console.log("encoded calldata", calldata)
         const signer = hre.ethers.provider.getSigner(0);
         const result = await signer.call({
             to: args.address,
