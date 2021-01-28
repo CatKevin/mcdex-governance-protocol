@@ -95,6 +95,7 @@ module.exports = {
     defaultNetwork: "hardhat",
     networks: {
         hardhat: {
+            // loggingEnabled: true
         },
         s10: {
             url: "http://server10.jy.mcarlo.com:8747",
