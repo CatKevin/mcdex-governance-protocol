@@ -8,6 +8,7 @@ import {
     createContract,
 } from '../scripts/utils';
 
+
 describe('LPGovernor', () => {
     let accounts;
     let user0;
@@ -107,12 +108,14 @@ describe('LPGovernor', () => {
 
         console.log("getPriorVotes", fromWei(await governor.getPriorVotes(user1.address, 7)));
 
-        await governor.connect(user1).propose(
+        let tx2 = await governor.connect(user1).propose(
             [target.address],
             [0],
             ["setFastCreationEnabled(bool)"],
             ["0x0000000000000000000000000000000000000000000000000000000000000001"],
             "setFastCreationEnabled to true"
         );
+        tx2 = await tx.wait()
+        console.log(tx2);
     })
 })
