@@ -26,19 +26,26 @@ contract LPGovernor is Initializable, Mining, SnapshotLockableBallotBox {
         keccak256(bytes("setOperator(address)"));
     address public liquidityPool;
 
+    address internal _target;
+
     function initialize(
+        address target_,
         address shareToken_,
-        address rewardToken_,
-        address timelock_,
-        address guardian_
+        address rewardToken_
     ) public initializer {
         __Ownable_init_unchained();
         __Bank_init_unchained(shareToken_);
         __RewardDistribution_init_unchained(rewardToken_);
         __Mining_init_unchained();
-        __BallotBox_init_unchained(timelock_, guardian_);
+        __BallotBox_init_unchained();
         __ShareLock_init_unchained();
         __SnapshotLockableBallotBox_init_unchained();
+
+        _target = target_;
+    }
+
+    function target() public view returns (address) {
+        return _target;
     }
 
     function criticalQuorumVotes() public pure returns (uint256) {
@@ -81,5 +88,20 @@ contract LPGovernor is Initializable, Mining, SnapshotLockableBallotBox {
         updateReward(msg.sender)
     {
         SnapshotLockableBallotBox.withdraw(amount);
+    }
+
+    function propose(
+        string[] memory signatures,
+        bytes[] memory calldatas,
+        string memory description
+    ) public virtual returns (uint256) {
+        uint256 length = calldatas.length;
+        address[] memory targets = new address[](length);
+        uint256[] memory values = new uint256[](length);
+        for (uint256 i = 0; i < length; i++) {
+            targets[i] = _target;
+            values[i] = 0;
+        }
+        return _propose(targets, values, signatures, calldatas, description);
     }
 }

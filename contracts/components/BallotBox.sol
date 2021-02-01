@@ -10,6 +10,8 @@ import "../interface/ITimeLock.sol";
 import "./Delegate.sol";
 import "./Signature.sol";
 
+import "hardhat/console.sol";
+
 /// @notice Possible states that a proposal may be in
 enum ProposalState { Pending, Active, Canceled, Defeated, Succeeded, Queued, Expired, Executed }
 
@@ -61,7 +63,7 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
     bytes32 public constant BALLOT_TYPEHASH = keccak256("Ballot(uint256 proposalId,bool support)");
 
     /// @notice The address of the Compound Protocol Timelock
-    ITimeLock public timelock;
+    // ITimeLock public timelock;
 
     /// @notice The address of the Governor Guardian
     address public guardian;
@@ -87,6 +89,14 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
         uint256 endBlock,
         string description
     );
+    event ExecuteTransaction(
+        bytes32 indexed txHash,
+        address indexed target,
+        uint256 value,
+        string signature,
+        bytes data,
+        uint256 eta
+    );
 
     /// @notice An event emitted when a vote has been cast on a proposal
     event VoteCast(address voter, uint256 proposalId, bool support, uint256 votes);
@@ -100,13 +110,13 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
     /// @notice An event emitted when a proposal has been executed in the Timelock
     event ProposalExecuted(uint256 id);
 
-    function __BallotBox_init(address timelock_, address guardian_) internal virtual initializer {
-        __BallotBox_init_unchained(timelock_, guardian_);
+    function __BallotBox_init() internal virtual initializer {
+        __BallotBox_init_unchained();
     }
 
-    function __BallotBox_init_unchained(address timelock_, address guardian_) internal initializer {
-        timelock = ITimeLock(timelock_);
-        guardian = guardian_;
+    function __BallotBox_init_unchained() internal initializer {
+        // timelock = ITimeLock(timelock_);
+        // guardian = guardian_;
     }
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached
@@ -152,13 +162,13 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
         return effectiveTotalSupply.mul(proposalThreshold()).div(1e18);
     }
 
-    function propose(
+    function _propose(
         address[] memory targets,
         uint256[] memory values,
         string[] memory signatures,
         bytes[] memory calldatas,
         string memory description
-    ) public returns (uint256) {
+    ) internal virtual returns (uint256) {
         uint256 priorVotes = getPriorVotes(msg.sender, block.number.sub(1));
         require(
             priorVotes > getPriorThreshold(block.number.sub(1)),
@@ -222,84 +232,49 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
         return proposalId;
     }
 
-    function queue(uint256 proposalId) public {
-        require(
-            state(proposalId) == ProposalState.Succeeded,
-            "proposal can only be queued if it is succeeded"
-        );
-        Proposal storage proposal = proposals[proposalId];
-        uint256 eta = block.timestamp.add(timelock.delay());
-        for (uint256 i = 0; i < proposal.targets.length; i++) {
-            _queueOrRevert(
-                proposal.targets[i],
-                proposal.values[i],
-                proposal.signatures[i],
-                proposal.calldatas[i],
-                eta
-            );
-        }
-        proposal.eta = eta;
-        emit ProposalQueued(proposalId, eta);
-    }
-
-    function _queueOrRevert(
-        address target,
-        uint256 value,
-        string memory signature,
-        bytes memory data,
-        uint256 eta
-    ) internal {
-        require(
-            !timelock.queuedTransactions(
-                keccak256(abi.encode(target, value, signature, data, eta))
-            ),
-            "proposal action already queued at eta"
-        );
-        timelock.queueTransaction(target, value, signature, data, eta);
-    }
-
     function execute(uint256 proposalId) public payable {
         require(
-            state(proposalId) == ProposalState.Queued,
-            "proposal can only be executed if it is queued"
+            state(proposalId) == ProposalState.Succeeded,
+            "proposal can only be executed if it is success and queued"
         );
         Proposal storage proposal = proposals[proposalId];
         proposal.executed = true;
         for (uint256 i = 0; i < proposal.targets.length; i++) {
-            timelock.executeTransaction{ value: proposal.values[i] }(
+            _executeTransaction(
                 proposal.targets[i],
                 proposal.values[i],
                 proposal.signatures[i],
                 proposal.calldatas[i],
-                proposal.eta
+                proposal.endBlock
             );
         }
         emit ProposalExecuted(proposalId);
     }
 
-    function cancel(uint256 proposalId) public {
-        require(state(proposalId) != ProposalState.Executed, "cannot cancel executed proposal");
+    function _executeTransaction(
+        address target,
+        uint256 value,
+        string memory signature,
+        bytes memory data,
+        uint256 eta
+    ) public payable returns (bytes memory) {
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
+        uint256 blockNumber = _getBlockNumber();
+        require(blockNumber >= eta.add(gracePeriod()), "Transaction hasn't surpassed time lock.");
+        require(blockNumber <= eta.add(gracePeriod()).add(unlockPeriod()), "Transaction is stale.");
 
-        Proposal storage proposal = proposals[proposalId];
-        require(
-            msg.sender == guardian ||
-                getPriorVotes(msg.sender, block.number.sub(1)) <
-                getPriorThreshold(block.number.sub(1)),
-            "proposer above threshold"
-        );
-
-        proposal.canceled = true;
-        for (uint256 i = 0; i < proposal.targets.length; i++) {
-            timelock.cancelTransaction(
-                proposal.targets[i],
-                proposal.values[i],
-                proposal.signatures[i],
-                proposal.calldatas[i],
-                proposal.eta
-            );
+        bytes memory callData;
+        if (bytes(signature).length == 0) {
+            callData = data;
+        } else {
+            console.log("***", target);
+            callData = abi.encodePacked(bytes4(keccak256(bytes(signature))), data);
         }
-
-        emit ProposalCanceled(proposalId);
+        // solium-disable-next-line security/no-call-value
+        (bool success, bytes memory returnData) = target.call{ value: value }(callData);
+        require(success, "Transaction execution reverted.");
+        emit ExecuteTransaction(txHash, target, value, signature, data, eta);
+        return returnData;
     }
 
     function getActions(uint256 proposalId)
@@ -334,14 +309,14 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
             proposal.forVotes < getQuorumVotes(proposalId)
         ) {
             return ProposalState.Defeated;
-        } else if (proposal.eta == 0) {
-            return ProposalState.Succeeded;
         } else if (proposal.executed) {
             return ProposalState.Executed;
-        } else if (block.timestamp >= proposal.eta.add(timelock.GRACE_PERIOD())) {
-            return ProposalState.Expired;
-        } else {
+        } else if (block.number <= proposal.endBlock.add(gracePeriod())) {
             return ProposalState.Queued;
+        } else if (block.number > proposal.endBlock.add(gracePeriod()).add(unlockPeriod())) {
+            return ProposalState.Expired;
+        } else if (!proposal.executed) {
+            return ProposalState.Succeeded;
         }
     }
 
@@ -362,7 +337,7 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
     ) public {
         bytes32 domainSeparator =
             keccak256(
-                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this))
+                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this))
             );
         bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
@@ -395,43 +370,8 @@ abstract contract BallotBox is Initializable, Signature, Delegate {
         emit VoteCast(voter, proposalId, support, votes);
     }
 
-    function __acceptAdmin() public {
-        require(msg.sender == guardian, "sender must be gov guardian");
-        timelock.acceptAdmin();
-    }
-
-    function __abdicate() public {
-        require(msg.sender == guardian, "sender must be gov guardian");
-        guardian = address(0);
-    }
-
-    function __queueSetTimelockPendingAdmin(address newPendingAdmin, uint256 eta) public {
-        require(msg.sender == guardian, "sender must be gov guardian");
-        timelock.queueTransaction(
-            address(timelock),
-            0,
-            "setPendingAdmin(address)",
-            abi.encode(newPendingAdmin),
-            eta
-        );
-    }
-
-    function __executeSetTimelockPendingAdmin(address newPendingAdmin, uint256 eta) public {
-        require(msg.sender == guardian, "sender must be gov guardian");
-        timelock.executeTransaction(
-            address(timelock),
-            0,
-            "setPendingAdmin(address)",
-            abi.encode(newPendingAdmin),
-            eta
-        );
-    }
-
-    function getChainId() internal pure returns (uint256) {
-        uint256 chainId;
-        assembly {
-            chainId := chainid()
-        }
-        return chainId;
+    function _getBlockNumber() internal view returns (uint256) {
+        // solium-disable-next-line security/no-block-members
+        return block.number;
     }
 }

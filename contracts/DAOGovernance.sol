@@ -20,12 +20,8 @@ import "./components/LockableBallotBox.sol";
 */
 
 contract DAOGovernance is Initializable, Dividends, LockableBallotBox {
-    function __DAOGovernance_init(
-        address shareToken_,
-        address timelock_,
-        address guardian_
-    ) internal initializer {
-        __BallotBox_init_unchained(timelock_, guardian_);
+    function __DAOGovernance_init(address shareToken_) internal initializer {
+        __BallotBox_init_unchained();
         __DAOGovernance_init_unchained(shareToken_);
     }
 

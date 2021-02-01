@@ -25,7 +25,11 @@ abstract contract LockableBallotBox is BallotBox {
     }
 
     function withdraw(uint256 amount) public virtual override {
-        require(!isLocked(msg.sender), "share token is locked by voting");
+        require(!isLocked(msg.sender), "share token is locked by voter");
+        address delegate = getDelegate(msg.sender);
+        if (delegate != msg.sender) {
+            require(!isLocked(delegate), "share token is locked by delegate");
+        }
         super.withdraw(amount);
     }
 

@@ -19,7 +19,7 @@ describe('LPGovernor', () => {
     let stk;
     let rtk;
     let governor;
-    let timelock;
+    let target;
 
     before(async () => {
         accounts = await getAccounts();
@@ -32,8 +32,8 @@ describe('LPGovernor', () => {
     beforeEach(async () => {
         stk = await createContract("ShareToken");
         rtk = await createContract("CustomERC20", ["RTK", "RTK", 18]);
-        timelock = await createContract("Timelock", [user0.address, 86400]);
         governor = await createContract("TestLPGovernor");
+        target = await createContract("MockLiquidityPool");
 
         // console.table([
         //     ["STK", stk.address],
@@ -43,7 +43,7 @@ describe('LPGovernor', () => {
         // ])
 
         await stk.initialize("STK", "STK", user0.address);
-        await governor.initialize(stk.address, rtk.address, timelock.address, user0.address);
+        await governor.initialize(target.address, stk.address, rtk.address);
     });
 
     // it("stake / withdraw", async () => {
@@ -115,7 +115,7 @@ describe('LPGovernor', () => {
             ["0x0000000000000000000000000000000000000000000000000000000000000001"],
             "setFastCreationEnabled to true"
         );
-        tx2 = await tx.wait()
-        console.log(tx2);
+
+        console.log(await governor.state(0));
     })
 })
