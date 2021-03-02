@@ -5,10 +5,12 @@ contract GovernorAlpha {
     /// @notice The name of this contract
     string public constant name = "Compound Governor Alpha";
 
+    // 10,000,000;
+
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
     function quorumVotes() public pure returns (uint256) {
-        return 400000e18;
-    } // 400,000 = 4% of Comp
+        return 1000000e18;
+    } // 1,000,000 = 10% of mcb
 
     /// @notice The number of votes required in order for a voter to become a proposer
     function proposalThreshold() public pure returns (uint256) {
@@ -21,12 +23,12 @@ contract GovernorAlpha {
     } // 10 actions
 
     /// @notice The delay before voting on a proposal may take place, once proposed
-    function votingDelay() public pure returns (uint256) {
+    function votingDelay() public pure virtual returns (uint256) {
         return 1;
     } // 1 block
 
     /// @notice The duration of voting on a proposal, in blocks
-    function votingPeriod() public pure returns (uint256) {
+    function votingPeriod() public pure virtual returns (uint256) {
         return 17280;
     } // ~3 days in blocks (assuming 15s blocks)
 
@@ -142,7 +144,7 @@ contract GovernorAlpha {
         string memory description
     ) public returns (uint256) {
         require(
-            comp.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold(),
+            comp.getPriorVotes(msg.sender, sub256(getBlockNumber(), 1)) > proposalThreshold(),
             "GovernorAlpha::propose: proposer votes below proposal threshold"
         );
         require(
@@ -170,7 +172,7 @@ contract GovernorAlpha {
             );
         }
 
-        uint256 startBlock = add256(block.number, votingDelay());
+        uint256 startBlock = add256(getBlockNumber(), votingDelay());
         uint256 endBlock = add256(startBlock, votingPeriod());
 
         proposalCount++;
@@ -207,7 +209,7 @@ contract GovernorAlpha {
             "GovernorAlpha::queue: proposal can only be queued if it is succeeded"
         );
         Proposal storage proposal = proposals[proposalId];
-        uint256 eta = add256(block.timestamp, timelock.delay());
+        uint256 eta = add256(getBlockTimestamp(), timelock.delay());
         for (uint256 i = 0; i < proposal.targets.length; i++) {
             _queueOrRevert(
                 proposal.targets[i],
@@ -266,7 +268,7 @@ contract GovernorAlpha {
         Proposal storage proposal = proposals[proposalId];
         require(
             msg.sender == guardian ||
-                comp.getPriorVotes(proposal.proposer, sub256(block.number, 1)) <
+                comp.getPriorVotes(proposal.proposer, sub256(getBlockNumber(), 1)) <
                 proposalThreshold(),
             "GovernorAlpha::cancel: proposer above threshold"
         );
@@ -311,9 +313,9 @@ contract GovernorAlpha {
         Proposal storage proposal = proposals[proposalId];
         if (proposal.canceled) {
             return ProposalState.Canceled;
-        } else if (block.number <= proposal.startBlock) {
+        } else if (getBlockNumber() <= proposal.startBlock) {
             return ProposalState.Pending;
-        } else if (block.number <= proposal.endBlock) {
+        } else if (getBlockNumber() <= proposal.endBlock) {
             return ProposalState.Active;
         } else if (
             proposal.forVotes <= proposal.againstVotes || proposal.forVotes < quorumVotes()
@@ -323,7 +325,7 @@ contract GovernorAlpha {
             return ProposalState.Succeeded;
         } else if (proposal.executed) {
             return ProposalState.Executed;
-        } else if (block.timestamp >= add256(proposal.eta, timelock.GRACE_PERIOD())) {
+        } else if (getBlockTimestamp() >= add256(proposal.eta, timelock.GRACE_PERIOD())) {
             return ProposalState.Expired;
         } else {
             return ProposalState.Queued;
@@ -437,6 +439,14 @@ contract GovernorAlpha {
             chainId := chainid()
         }
         return chainId;
+    }
+
+    function getBlockNumber() internal view virtual returns (uint256) {
+        return block.number;
+    }
+
+    function getBlockTimestamp() internal view virtual returns (uint256) {
+        return block.timestamp;
     }
 }
 

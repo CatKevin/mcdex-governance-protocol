@@ -8,10 +8,24 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
+import "hardhat/console.sol";
+
 interface IUSDConvertor {
-    function usdToken() external view returns (address tokenAddress);
+    function tokenIn() external view returns (address token);
+
+    function tokenOut() external view returns (address token);
 
     function covertToUSD(uint256 tokenAmount) external returns (uint256 usdAmount);
+}
+
+interface IDecimals {
+    function decimals() external view returns (uint8);
+}
+
+struct USDTokenInfo {
+    uint256 scaler;
+    uint256 cumulativeCapturedBalance;
+    IUSDConvertor converter;
 }
 
 contract ValueCapture {
@@ -20,11 +34,14 @@ contract ValueCapture {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    uint256 public constant SYSTEM_DECIMALS = 18;
+
     address internal _dao;
     address internal _vault;
-    uint256 internal _capturedUSD;
+    uint256 internal _totalCapturedUSD;
+
     EnumerableSet.AddressSet internal _usdTokens;
-    mapping(address => address) internal _usdConverters;
+    mapping(address => USDTokenInfo) internal _usdTokenInfos;
 
     event AddUSDToken(address tokenAddresss);
     event RemoveUSDToken(address tokenAddresss);
@@ -51,7 +68,7 @@ contract ValueCapture {
     }
 
     function getCapturedUSD() public view returns (uint256) {
-        return _capturedUSD;
+        return _totalCapturedUSD;
     }
 
     function getUSDTokenCount() public view returns (uint256) {
@@ -71,29 +88,54 @@ contract ValueCapture {
         return results;
     }
 
-    function getConverter(address token) public view returns (address) {
-        return _usdConverters[token];
+    function getUSDTokenInfo(address token)
+        public
+        view
+        returns (
+            uint256,
+            uint256,
+            address
+        )
+    {
+        USDTokenInfo storage info = _usdTokenInfos[token];
+        return (info.scaler, info.cumulativeCapturedBalance, address(info.converter));
     }
 
-    function setUSDToken(address token) public onlyDAO {
-        require(!_usdTokens.contains(token), "token already in usd list");
+    function setUSDToken(address token, uint256 decimals) public onlyDAO {
         require(token.isContract(), "token address must be contract");
+        require(!_usdTokens.contains(token), "token already in usd list");
+        require(decimals >= 0 && decimals <= 18, "decimals out of range");
+
+        try IDecimals(token).decimals() returns (uint8 actualDecimals) {
+            require(actualDecimals == decimals, "decimals not match");
+        } catch {}
+
         bool isAdded = _usdTokens.add(token);
         require(isAdded, "fail to add token to list");
+
+        uint256 factor = 10**(SYSTEM_DECIMALS.sub(decimals));
+        _usdTokenInfos[token].scaler = (factor == 0 ? 1 : factor);
+
         emit AddUSDToken(token);
     }
 
     function unsetUSDToken(address token) public onlyDAO {
         require(_usdTokens.contains(token), "token not in usd list");
+
         bool isRemoved = _usdTokens.remove(token);
         require(isRemoved, "fail to remove token from list");
+        // leave _usdTokenInfos unremoved
+
         emit RemoveUSDToken(token);
     }
 
     function setUSDConverter(address token, address converter) public onlyDAO {
-        address usdToken = IUSDConvertor(converter).usdToken();
-        require(_usdTokens.contains(usdToken), "converted usd not in list");
-        _usdConverters[token] = converter;
+        require(converter.isContract(), "converter must be contract");
+        address tokenOut = IUSDConvertor(converter).tokenOut();
+        require(_usdTokens.contains(tokenOut), "token out not in list");
+
+        _usdTokenInfos[token].converter = IUSDConvertor(converter);
+
         emit SetUSDConverter(token, converter);
     }
 
@@ -118,12 +160,17 @@ contract ValueCapture {
     }
 
     function collectToken(address token) public {
-        require(token.isContract(), "token address must be contract");
         require(_vault != address(0), "vault is not set");
 
         (address tokenOut, uint256 balanceOut) = _convertTokenToUSD(token);
-        require(tokenOut != address(0) && balanceOut != 0, "invalid converted output");
-        _capturedUSD = _capturedUSD.add(balanceOut);
+
+        require(balanceOut != 0, "invalid out balance");
+        require(_usdTokens.contains(tokenOut), "unexpected out token");
+
+        USDTokenInfo storage info = _usdTokenInfos[tokenOut];
+        uint256 normalizeOutBalance = balanceOut.mul(info.scaler);
+        _totalCapturedUSD = _totalCapturedUSD.add(normalizeOutBalance);
+        info.cumulativeCapturedBalance = info.cumulativeCapturedBalance.add(normalizeOutBalance);
         IERC20(tokenOut).safeTransfer(_vault, balanceOut);
 
         emit TranferToVault(tokenOut, balanceOut);
@@ -141,18 +188,21 @@ contract ValueCapture {
             tokenOut = tokenIn;
             balanceOut = balanceIn;
         } else {
-            address converter = _usdConverters[tokenIn];
-            tokenOut = IUSDConvertor(converter).usdToken();
+            IUSDConvertor converter = _usdTokenInfos[tokenIn].converter;
+            require(address(converter) != address(0), "token has no converter");
+            tokenOut = converter.tokenOut();
             require(_usdTokens.contains(tokenOut), "converted usd not in list");
-            require(converter != address(0), "token has no converter");
-
             uint256 prevBalance = IERC20(tokenOut).balanceOf(address(this));
             {
-                IERC20(tokenIn).approve(converter, balanceIn);
-                balanceOut = IUSDConvertor(converter).covertToUSD(balanceIn);
-                require(balanceOut > 0, "invalid return amount");
+                console.log("[DEBUG] balanceIn", balanceIn);
+                IERC20(tokenIn).approve(address(converter), balanceIn);
+                balanceOut = converter.covertToUSD(balanceIn);
+                console.log("[DEBUG] balanceOut", balanceOut);
+
+                require(balanceOut > 0, "balance out is 0");
             }
             uint256 postBalance = IERC20(tokenOut).balanceOf(address(this));
+
             require(postBalance.sub(prevBalance) == balanceOut, "converted balance not match");
         }
         emit ConvertToUSD(tokenIn, balanceIn, tokenOut, balanceOut);

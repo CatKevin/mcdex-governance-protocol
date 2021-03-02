@@ -4,6 +4,8 @@ pragma solidity 0.7.4;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
+import "hardhat/console.sol";
+
 contract Timelock {
     using SafeMath for uint256;
 
@@ -147,7 +149,7 @@ contract Timelock {
         return returnData;
     }
 
-    function getBlockTimestamp() internal view returns (uint256) {
+    function getBlockTimestamp() internal view virtual returns (uint256) {
         // solium-disable-next-line security/no-block-members
         return block.timestamp;
     }
