@@ -31,7 +31,6 @@ contract RewardDistribution is Context, Ownable {
         uint256 rewardRate;
         uint256 lastUpdateTime;
         uint256 rewardPerTokenStored;
-        address rewardDistribution;
         mapping(address => uint256) userRewardPerTokenPaid;
         mapping(address => uint256) rewards;
     }
@@ -84,6 +83,8 @@ contract RewardDistribution is Context, Ownable {
         }
     }
 
+    /**
+     */
     function hasPlan(address token) public view returns (bool) {
         return address(_rewardPlans[token].rewardToken) != address(0);
     }
@@ -96,6 +97,20 @@ contract RewardDistribution is Context, Ownable {
         _rewardPlans[token].rewardRate = rewardRate;
         _activeReward.add(token);
         emit RewardPlanCreated(token, rewardRate);
+    }
+
+    function getRewardTokens() public view returns (address[] memory) {
+        uint256 tokenCount = _activeReward.length();
+        address[] memory results = new address[](tokenCount);
+        for (uint256 i = 0; i < tokenCount; i++) {
+            results[i] = _activeReward.at(i);
+        }
+        return results;
+    }
+
+    function getRewardPlan(address token) public view returns (uint256, uint256) {
+        RewardPlan storage plan = _rewardPlans[token];
+        return (plan.periodFinish, plan.rewardRate);
     }
 
     /**
@@ -196,7 +211,7 @@ contract RewardDistribution is Context, Ownable {
     }
 
     /**
-     * @notice  Claim all remaining reward of account.
+     * @notice  Claim remaining reward of a token for caller.
      */
     function getReward(address token) public updateReward(token, _msgSender()) {
         RewardPlan storage plan = _rewardPlans[token];
@@ -206,6 +221,16 @@ contract RewardDistribution is Context, Ownable {
             plan.rewards[account] = 0;
             plan.rewardToken.safeTransfer(account, reward);
             emit RewardPaid(account, reward);
+        }
+    }
+
+    /**
+     * @notice  Claim remaining reward of all tokens for caller.
+     */
+    function getAllRewards() public {
+        uint256 length = _activeReward.length();
+        for (uint256 i = 0; i < length; i++) {
+            getReward(_activeReward.at(i));
         }
     }
 

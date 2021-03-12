@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.7.4;
 
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-import "./libraries/SafeOwnable.sol";
+// import "./libraries/SafeOwnable.sol";
 import "./interfaces/IComponent.sol";
 
-contract BalanceBroadcaster is SafeOwnable {
+contract BalanceBroadcaster is Initializable, OwnableUpgradeable {
     using SafeMathUpgradeable for uint256;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 

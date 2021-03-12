@@ -1,22 +1,21 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.7.4;
 
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/GSN/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 
-import "./libraries/SafeOwnable.sol";
 import "./Comp.sol";
 import "./BalanceBroadcaster.sol";
 
-contract XMCB is Initializable, ContextUpgradeable, SafeOwnable, Comp, BalanceBroadcaster {
+contract XMCB is Initializable, ContextUpgradeable, OwnableUpgradeable, Comp, BalanceBroadcaster {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     uint256 private constant WONE = 1e18;
-
     uint96 internal _rawTotalSupply;
 
     IERC20Upgradeable public rawToken;
@@ -26,6 +25,13 @@ contract XMCB is Initializable, ContextUpgradeable, SafeOwnable, Comp, BalanceBr
     event Withdraw(address indexed account, uint256 amount, uint256 penalty);
     event SetWithdrawalPenaltyRate(uint256 previousPenaltyRate, uint256 newPenaltyRate);
 
+    /**
+     * @notice  initialize XMCB token.
+     * @param   owner_                  Owner of XMCB who is able to set withdraw penalty rate.
+     * @param   rawToken_               The token used as collateral for XMCB.
+     * @param   withdrawalPenaltyRate_  The penalty rate when user withdaw.
+     *                                  The deducted part will be added to all remining holders.
+     */
     function initialize(
         address owner_,
         address rawToken_,
@@ -35,36 +41,61 @@ contract XMCB is Initializable, ContextUpgradeable, SafeOwnable, Comp, BalanceBr
         __Ownable_init_unchained();
         __Comp_init_unchained();
         __BalanceBroadcaster_init_unchained();
-
         rawToken = IERC20Upgradeable(rawToken_);
         withdrawalPenaltyRate = withdrawalPenaltyRate_;
         transferOwnership(owner_);
     }
 
+    /**
+     * @notice  The balance of an account, also known as weighted balance.
+     *          The balance is affected by a magnification factor,
+     *          which is changed on every withdrawal (expect the last time).
+     *          This is how the holders share the profit from withdrawal penalty.
+     */
     function balanceOf(address account) public view virtual override returns (uint256) {
         return _wmul(_balances[account], _balanceFactor());
     }
 
+    /**
+     * @notice  Comparing to `balanceOf`, raw balance indicates the unweighted balance.
+     *          This may be useful for other contract which takes XMCB's balance as reference.
+     */
     function rawBalanceOf(address account) public view virtual returns (uint256) {
         return _balances[account];
     }
 
+    /**
+     * @notice  Like `rawBalanceOf`, this is the unweighted total supply.
+     */
     function rawTotalSupply() public view virtual returns (uint256) {
         return uint256(_rawTotalSupply);
     }
 
+    /**
+     * @notice  Set withdrawal penalty rate. Only available to owner of XMCB.
+     * @param   withdrawalPenaltyRate_  A fixed-point decimal, when 1e18 == 100% and 1e16 == 1%.
+     */
     function setWithdrawalPenaltyRate(uint256 withdrawalPenaltyRate_) public virtual onlyOwner {
         require(withdrawalPenaltyRate_ <= WONE, "new withdrawalPenaltyRate exceed 100%");
         emit SetWithdrawalPenaltyRate(withdrawalPenaltyRate, withdrawalPenaltyRate_);
         withdrawalPenaltyRate = withdrawalPenaltyRate_;
     }
 
+    /**
+     * @notice  Deposit `rawToken` for XMCB token. The exchange rate is always 1:1.
+     * @param   amount  The amount of `rawToken` to deposit.
+     */
     function deposit(uint256 amount) public virtual {
         require(amount > 0, "zero amount");
         _beforeMintingToken(_msgSender(), amount, _totalSupply);
         _deposit(_msgSender(), amount);
     }
 
+    /**
+     * @notice  Exchange an equal amount of XMCB for `rawToken`. A withrawal penalty will be applied on the amount.
+     *          User is expected to get `amount * (1 - withdrawalPenaltyRate)` token back.
+     * @param   amount  The amount of `rawToken` to withdraw.
+     */
     function withdraw(uint256 amount) public virtual {
         require(amount != 0, "zero amount");
         require(amount <= balanceOf(_msgSender()), "exceeded withdrawable balance");
@@ -140,5 +171,6 @@ contract XMCB is Initializable, ContextUpgradeable, SafeOwnable, Comp, BalanceBr
         z = x.mul(WONE).add(y / 2).div(y);
     }
 
+    // reserved for upgrade
     uint256[50] private __gap;
 }

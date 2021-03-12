@@ -15,12 +15,12 @@ abstract contract SafeOwnable is Initializable, ContextUpgradeable {
     /**
      * @dev Initializes the contract setting the deployer as the initial owner.
      */
-    function __Ownable_init() internal initializer {
+    function __SafeOwnable_init() internal initializer {
         __Context_init_unchained();
-        __Ownable_init_unchained();
+        __SafeOwnable_init_unchained();
     }
 
-    function __Ownable_init_unchained() internal initializer {
+    function __SafeOwnable_init_unchained() internal initializer {
         address msgSender = _msgSender();
         _owner = msgSender;
         emit OwnershipTransferred(address(0), msgSender);
@@ -63,7 +63,6 @@ abstract contract SafeOwnable is Initializable, ContextUpgradeable {
      * Can only be called by the current owner.
      */
     function transferOwnership(address newOwner) public virtual onlyOwner {
-        require(newOwner != _owner, "Ownable: new owner is already owner");
         require(newOwner != address(0), "Ownable: new owner is the zero address");
         emit OwnershipTransferred(_owner, newOwner);
         _pendingOwner = newOwner;

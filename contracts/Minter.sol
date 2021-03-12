@@ -6,31 +6,28 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
 interface IValueCapture {
-    function getCapturedUSD() external view returns (uint256);
+    function totalCapturedUSD() external view returns (uint256);
 }
 
 interface IMCB is IERC20Upgradeable {
     function mint(address account, uint256 amount) external;
 }
 
-contract MCBMinter {
+contract Minter {
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
 
     IMCB public mcbToken;
 
-    address internal _dev;
     address public valueCapture;
 
-    uint256 public phase1BeginTime;
-    uint256 public phase1DailySupplyLimit;
-    uint256 public phase2BeginTime;
-    uint256 public phase2DailySupplyLimit;
-    uint256 public totalSupplyLimitation;
+    address public devAccount;
+    uint256 public devShareRate;
 
-    uint256 internal _mintedMCB;
-    uint256 internal _devShareRate;
-    uint256 internal _lastMintTime;
+    uint256 public beginTime;
+    uint256 public dailySupplyLimit;
+    uint256 public totalSupplyLimit;
+    uint256 public initialSupply;
 
     event MintMCB(
         address indexed recipient,
@@ -39,68 +36,82 @@ contract MCBMinter {
         uint256 devReceivedAmount
     );
 
-    event SetDev(address indexed devOld, address indexed devNew);
+    event SetDevAccount(address indexed devOld, address indexed devNew);
 
-    constructor(address mcbToken_) {
+    constructor(
+        address mcbToken_,
+        address valueCapture_,
+        address devAccount_,
+        uint256 devShareRate_,
+        uint256 totalSupplyLimit_,
+        uint256 beginTime_,
+        uint256 dailySupplyLimit_
+    ) {
         require(mcbToken_.isContract(), "token must be contract");
-
+        require(valueCapture_.isContract(), "value capture must be contract");
         mcbToken = IMCB(mcbToken_);
-        // require(
-        //     supplyLimitation_ >= mcbToken.totalSupply(),
-        //     "supply limitation exceeds total supply"
-        // );
+        valueCapture = valueCapture_;
+
+        devAccount = devAccount_;
+        devShareRate = devShareRate_;
+        totalSupplyLimit = totalSupplyLimit_;
+        beginTime = beginTime_;
+        dailySupplyLimit = dailySupplyLimit_;
+
+        initialSupply = mcbToken.totalSupply();
     }
 
-    function setDev(address dev) public {
-        require(msg.sender == dev, "caller must be dev");
-        emit SetDev(_dev, dev);
-        _dev = dev;
+    function setDevAccount(address devAccount_) external {
+        require(msg.sender == devAccount, "caller must be dev account");
+        require(devAccount_ != devAccount, "already dev account");
+        emit SetDevAccount(devAccount, devAccount_);
+        devAccount = devAccount_;
     }
 
-    function mintMCB(address recipient, uint256 amount) public {
-        uint256 maxMintableAmount = _getMintableAmount();
-        require(amount <= maxMintableAmount, "exceed mintable amount");
-        require(
-            mcbToken.totalSupply().add(amount) <= totalSupplyLimitation,
-            "exceeds total supply limitation"
-        );
+    function mintableMCBToken() public view returns (uint256) {
+        uint256 amountByTime = mintableMCBTokenByTime();
+        uint256 amountByValue = mintableMCBTokenByValue();
+        uint256 mintableAmount = amountByTime > amountByValue ? amountByTime : amountByValue;
+        if (mintableAmount > mintedMCBToken()) {
+            uint256 mintableAmount = mintableAmount.sub(mintedMCBToken());
+            if (mintableAmount > totalSupplyLimit.sub(mcbToken.totalSupply())) {
+                return totalSupplyLimit.sub(mcbToken.totalSupply());
+            }
+            return mintableAmount;
+        }
+        return 0;
+    }
 
-        uint256 toDevAmount = amount.mul(phase2DailySupplyLimit).div(1e18);
+    function mintedMCBToken() public view returns (uint256) {
+        return mcbToken.totalSupply().sub(initialSupply);
+    }
+
+    function mintableMCBTokenByTime() public view returns (uint256) {
+        uint256 time = getBlockTimestamp();
+        if (time <= beginTime) {
+            return 0;
+        }
+        return time.sub(beginTime).mul(dailySupplyLimit).div(86400);
+    }
+
+    function mintableMCBTokenByValue() public view returns (uint256) {
+        return IValueCapture(valueCapture).totalCapturedUSD();
+    }
+
+    function mintMCBToken(address recipient, uint256 amount) public {
+        uint256 mintableAmount = mintableMCBToken();
+        require(amount > 0, "zero amount");
+        require(amount <= mintableAmount, "exceeds mintable amount");
+        uint256 toDevAmount = amount.mul(devShareRate).div(1e18);
         uint256 toRecipientAmount = amount.sub(toDevAmount);
+        mcbToken.mint(devAccount, toDevAmount);
         mcbToken.mint(recipient, toRecipientAmount);
-        mcbToken.mint(_dev, toDevAmount);
-        _mintedMCB = _mintedMCB.add(amount);
+        require(mcbToken.totalSupply() <= totalSupplyLimit, "exceeds supply limit");
 
         emit MintMCB(recipient, amount, toRecipientAmount, toDevAmount);
     }
 
-    function _getMintableAmount() internal view returns (uint256 mintableAmount) {
-        uint256 amountByTime = _getMintableAmountByTime(block.timestamp);
-        uint256 amountByValue = _getMintableAmountByValue();
-        // max between 2 limits
-        mintableAmount = amountByTime > amountByValue ? amountByTime : amountByValue;
-        mintableAmount = mintableAmount > _mintedMCB
-            ? mintableAmount = mintableAmount.sub(_mintedMCB)
-            : 0;
-    }
-
-    function _getMintableAmountByValue() internal view returns (uint256 mintableAmount) {
-        mintableAmount = IValueCapture(valueCapture).getCapturedUSD();
-    }
-
-    function _getMintableAmountByTime(uint256 time) internal view returns (uint256 mintableAmount) {
-        if (time <= phase1BeginTime) {
-            mintableAmount = 0;
-            return mintableAmount;
-        }
-        if (time > phase1BeginTime) {
-            uint256 mintable =
-                time.sub(phase1BeginTime).mul(1e18).div(86400).mul(phase1DailySupplyLimit);
-            mintableAmount = mintableAmount.add(mintable);
-        }
-        if (time > phase2BeginTime) {
-            uint256 mintable = time.sub(phase2BeginTime).mul(1e18).div(86400).mul(phase2BeginTime);
-            mintableAmount = mintableAmount.add(mintable);
-        }
+    function getBlockTimestamp() internal view virtual returns (uint256) {
+        return block.timestamp;
     }
 }

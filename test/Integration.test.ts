@@ -45,7 +45,8 @@ describe('Integration', () => {
 
     it("mcb <=> xmcb", async () => {
         const mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
-        const xmcb = await createContract("XMCB", [mcb.address, toWei("0.05")]);
+        const xmcb = await createContract("XMCB");
+        await xmcb.initialize(user0.address, mcb.address, toWei("0.05"));
 
         await mcb.mint(user1.address, toWei("100"));
         await mcb.mint(user2.address, toWei("100"));
@@ -84,7 +85,8 @@ describe('Integration', () => {
     it("mcb <=> xmcb", async () => {
         const usd = await createContract("CustomERC20", ["USD", "USD", 18]);
         const mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
-        const xmcb = await createContract("XMCB", [mcb.address, toWei("0.05")]);
+        const xmcb = await createContract("XMCB");
+        await xmcb.initialize(user0.address, mcb.address, toWei("0.05"));
 
         await mcb.mint(user1.address, toWei("1000000"));
         await mcb.mint(user2.address, toWei("100"));
@@ -120,7 +122,8 @@ describe('Integration', () => {
 
     it("capture", async () => {
         const mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
-        const xmcb = await createContract("XMCB", [mcb.address, toWei("0.05")]);
+        const xmcb = await createContract("XMCB");
+        await xmcb.initialize(user0.address, mcb.address, toWei("0.05"));
         const timelock = await createContract("TestTimelock", [user0.address, 86400]);
         const governor = await createContract("TestGovernorAlpha", [timelock.address, xmcb.address, user0.address]);
 
@@ -147,7 +150,9 @@ describe('Integration', () => {
 
         const vault = await createContract("Vault");
         await vault.initialize(timelock.address);
-        const valueCapture = await createContract("ValueCapture", [vault.address, user0.address]);
+        const valueCapture = await createContract("ValueCapture");
+        await valueCapture.initialize(vault.address, user0.address)
+        await valueCapture.setGuardian(user0.address);
 
         const tokenIn1 = await createContract("CustomERC20", ["TKN1", "TKN1", 18]);
         const tokenIn2 = await createContract("CustomERC20", ["TKN2", "TKN2", 18]);
@@ -183,14 +188,14 @@ describe('Integration', () => {
         await tokenIn3.connect(user1).transfer(valueCapture.address, "300000000")   // 300
 
         // convert
-        expect(await valueCapture.getCapturedUSD()).to.equal(0);
+        expect(await valueCapture.totalCapturedUSD()).to.equal(0);
 
         await valueCapture.collectToken(tokenIn1.address);
-        expect(await valueCapture.getCapturedUSD()).to.equal(toWei("400"));
+        expect(await valueCapture.totalCapturedUSD()).to.equal(toWei("400"));
         await valueCapture.collectToken(tokenIn2.address);
-        expect(await valueCapture.getCapturedUSD()).to.equal(toWei("1200"));
+        expect(await valueCapture.totalCapturedUSD()).to.equal(toWei("1200"));
         await valueCapture.collectToken(tokenIn3.address);
-        expect(await valueCapture.getCapturedUSD()).to.equal(toWei("2400"));
+        expect(await valueCapture.totalCapturedUSD()).to.equal(toWei("2400"));
 
         // vault
         expect(await tokenOu1.balanceOf(vault.address)).to.equal(toWei("400"))

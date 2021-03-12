@@ -49,12 +49,7 @@ contract ConstantSeller {
         require(price != 0, "no price");
         require(amount > 0, "0 amount");
 
-        console.log("[DEBUG] amount", amount);
-        console.log("[DEBUG] price", price);
-
         uint256 amountToReturn = (amount * price) / 1e18;
-        console.log("[DEBUG] amountToReturn", amountToReturn);
-
         tokenIn.transferFrom(msg.sender, address(this), amount);
         tokenOut.transfer(msg.sender, amountToReturn);
         return amountToReturn;
