@@ -203,7 +203,7 @@ contract Comp is Initializable, ContextUpgradeable {
         return checkpoints[account][lower].votes;
     }
 
-    function getDelegate(address delegator) internal view returns (address) {
+    function getDelegate(address delegator) public view returns (address) {
         address currentDelegate = delegates[delegator];
         return currentDelegate == address(0) ? delegator : currentDelegate;
     }

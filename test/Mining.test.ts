@@ -81,6 +81,8 @@ describe('Minging', () => {
 
         await mcb.mint(user1.address, toWei("10000"));
         await mcb.mint(user2.address, toWei("10000"));
+        await usd1.mint(rewardDistrubution.address, toWei("10000"));
+        await usd2.mint(rewardDistrubution.address, toWei("10000"));
         await mcb.connect(user1).approve(xmcb.address, toWei("10000"));
         await mcb.connect(user2).approve(xmcb.address, toWei("10000"));
 
@@ -112,5 +114,9 @@ describe('Minging', () => {
         expect(await rewardDistrubution.earned(usd1.address, user1.address)).to.equal(toWei("6"));
         expect(await rewardDistrubution.earned(usd1.address, user2.address)).to.equal(toWei("4"));
 
+        await rewardDistrubution.connect(user1).getAllRewards();
+        await rewardDistrubution.skipBlock(1);
+        expect(await rewardDistrubution.earned(usd1.address, user1.address)).to.equal(toWei("1"));
+        expect(await rewardDistrubution.earned(usd1.address, user2.address)).to.equal(toWei("5"));
     })
 })

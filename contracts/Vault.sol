@@ -38,9 +38,7 @@ contract Vault is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC721H
         address to,
         uint256 value
     ) external onlyOwner {
-        IERC20Upgradeable token = IERC20Upgradeable(tokenAddress);
-        uint256 balance = token.balanceOf(address(this));
-        IERC20Upgradeable(token).transfer(to, value);
+        IERC20Upgradeable(tokenAddress).transfer(to, value);
     }
 
     function transferERC20(

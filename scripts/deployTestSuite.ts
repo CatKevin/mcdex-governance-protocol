@@ -30,7 +30,7 @@ async function main(accounts: any[]) {
         ethers.utils.defaultAbiCoder.encode(["address"], [governor.address]),
         eta
     )
-    await timelock.skipTime(86400);
+    await timelock.skipTime(86400 + 1);
     await timelock.executeTransaction(
         timelock.address,
         0,
@@ -65,6 +65,16 @@ async function main(accounts: any[]) {
     await rewardDistrubution.createRewardPlan(mcb.address, toWei("0.2"));
     await rewardDistrubution.notifyRewardAmount(mcb.address, toWei("20000"));
 
+    const minter = await createContract("Minter", [
+        mcb.address,
+        valueCapture.address,
+        user0.address,
+        toWei("0.25"),
+        toWei("10000000"),
+        Math.floor(Date.now() / 1000),
+        toWei("86400") // 1 persecond
+    ]);
+
     console.table([
         ["mcb", mcb.address],
         ["xmcb", xmcb.address],
@@ -76,6 +86,7 @@ async function main(accounts: any[]) {
         ["tokenOu1", tokenOu1.address],
         ["seller1", seller1.address],
         ["mining", rewardDistrubution.address],
+        ["minter", minter.address],
     ])
 
 }
