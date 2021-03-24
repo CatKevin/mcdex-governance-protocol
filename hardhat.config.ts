@@ -102,7 +102,14 @@ module.exports = {
             url: "http://server10.jy.mcarlo.com:8747",
             gasPrice: "auto",
             blockGasLimit: "8000000"
-        }
+        },
+        kovan: {
+            url: "https://kovan.infura.io/v3/3582010d3cc14ab183653e5861d0c118",
+            gasPrice: 1e9,
+            accounts: ["0xd961926e05ae51949465139b95d91faf028de329278fa5db7462076dd4a245f4"],
+            timeout: 300000,
+            confirmations: 1,
+        },
     },
     solidity: {
         version: "0.7.4",

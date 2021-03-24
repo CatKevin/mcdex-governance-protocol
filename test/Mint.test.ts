@@ -125,10 +125,15 @@ describe('Minter', () => {
         expect(await minter.callStatic.getMintableAmountToSeriesA()).to.equal(toWei("0"))
         expect(await minter.callStatic.getMintableAmountToVault()).to.equal(toWei("2"))
 
-        await valueCapture.setCapturedUSD(toWei("0.4"));
+        await valueCapture.setCapturedUSD(toWei("0.4"));  // min = 0.2 extra = 0.2
         await minter.setBlockNumber(1001)
         expect(await minter.callStatic.getMintableAmountToSeriesA()).to.equal(toWei("0.2"))
-        expect(await minter.callStatic.getMintableAmountToVault()).to.equal(toWei("0.4"))
+        expect(await minter.callStatic.getMintableAmountToVault()).to.equal(toWei("0.2"))
+
+        await valueCapture.setCapturedUSD(toWei("1.0"));  // min 0.2 + extra1 0.55392 + extra2 (1-0.2-0.55392)
+        await minter.setBlockNumber(1001)
+        expect(await minter.callStatic.getMintableAmountToSeriesA()).to.equal(toWei("0.55392"))
+        expect(await minter.callStatic.getMintableAmountToVault()).to.equal(toWei("0.44608"))
     })
 
     // it("amount", async () => {

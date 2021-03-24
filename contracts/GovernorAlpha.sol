@@ -1,21 +1,25 @@
 pragma solidity 0.7.4;
 pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+
 contract GovernorAlpha {
+    address public constant MCB_TOKEN_ADDRESS = 0x0000000000000000000000000000000000000000;
+
     /// @notice The name of this contract
-    string public constant name = "Compound Governor Alpha";
+    string public constant name = "MCDEX DAO Governor Alpha";
 
     // 10,000,000;
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
-    function quorumVotes() public pure returns (uint256) {
-        return 1000000e18;
-    } // 1,000,000 = 10% of mcb
+    function quorumVotes() public view returns (uint256) {
+        return IERC20Upgradeable(MCB_TOKEN_ADDRESS).totalSupply() / 10;
+    } // 10% of mcb (current totalSupply)
 
     /// @notice The number of votes required in order for a voter to become a proposer
-    function proposalThreshold() public pure returns (uint256) {
-        return 100000e18;
-    } // 100,000 = 1% of Comp
+    function proposalThreshold() public view returns (uint256) {
+        return IERC20Upgradeable(MCB_TOKEN_ADDRESS).totalSupply() / 100;
+    } // 100,000 = 1% of mcb (current totalSupply)
 
     /// @notice The maximum number of actions that can be included in a proposal
     function proposalMaxOperations() public pure returns (uint256) {
@@ -67,6 +71,8 @@ contract GovernorAlpha {
         uint256 forVotes;
         // Current number of votes in opposition to this proposal
         uint256 againstVotes;
+        // Quorum number of votes when proposal created
+        uint256 quorumVotes;
         // Flag marking whether the proposal has been canceled
         bool canceled;
         // Flag marking whether the proposal has been executed
@@ -111,6 +117,7 @@ contract GovernorAlpha {
         bytes[] calldatas,
         uint256 startBlock,
         uint256 endBlock,
+        uint256 quorumVotes,
         string description
     );
 
@@ -130,7 +137,7 @@ contract GovernorAlpha {
         address timelock_,
         address comp_,
         address guardian_
-    ) public {
+    ) {
         timelock = TimelockInterface(timelock_);
         comp = CompInterface(comp_);
         guardian = guardian_;
@@ -186,6 +193,7 @@ contract GovernorAlpha {
         proposals[proposalId].calldatas = calldatas;
         proposals[proposalId].startBlock = startBlock;
         proposals[proposalId].endBlock = endBlock;
+        proposals[proposalId].quorumVotes = quorumVotes();
 
         latestProposalIds[msg.sender] = proposalId;
 
@@ -198,6 +206,7 @@ contract GovernorAlpha {
             calldatas,
             startBlock,
             endBlock,
+            proposals[proposalId].quorumVotes,
             description
         );
         return proposalId;
@@ -259,9 +268,8 @@ contract GovernorAlpha {
     }
 
     function cancel(uint256 proposalId) public {
-        ProposalState state = state(proposalId);
         require(
-            state != ProposalState.Executed,
+            state(proposalId) != ProposalState.Executed,
             "GovernorAlpha::cancel: cannot cancel executed proposal"
         );
 
@@ -318,7 +326,7 @@ contract GovernorAlpha {
         } else if (getBlockNumber() <= proposal.endBlock) {
             return ProposalState.Active;
         } else if (
-            proposal.forVotes <= proposal.againstVotes || proposal.forVotes < quorumVotes()
+            proposal.forVotes <= proposal.againstVotes || proposal.forVotes < proposal.quorumVotes
         ) {
             return ProposalState.Defeated;
         } else if (proposal.eta == 0) {

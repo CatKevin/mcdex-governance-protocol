@@ -11,21 +11,9 @@ contract TestMinter is Minter {
         address mcbToken_,
         address valueCapture_,
         address devAccount_,
-        uint256 devShareRate_,
-        uint256 genesisBlock_,
         Release memory default_,
         Release memory seriesA_
-    )
-        Minter(
-            mcbToken_,
-            valueCapture_,
-            devAccount_,
-            devShareRate_,
-            genesisBlock_,
-            default_,
-            seriesA_
-        )
-    {}
+    ) Minter(mcbToken_, valueCapture_, devAccount_, default_, seriesA_) {}
 
     function setBlockNumber(uint256 blockNumber) public {
         _mockBlockNumber = blockNumber;

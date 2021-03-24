@@ -48,6 +48,7 @@ describe('Integration', () => {
         const xmcb = await createContract("XMCB");
         await xmcb.initialize(user0.address, mcb.address, toWei("0.05"));
 
+
         await mcb.mint(user1.address, toWei("100"));
         await mcb.mint(user2.address, toWei("100"));
         await mcb.connect(user1).approve(xmcb.address, toWei("1000"));

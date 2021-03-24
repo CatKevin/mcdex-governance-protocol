@@ -9,6 +9,31 @@ import {
 } from './utils';
 
 async function main(accounts: any[]) {
+    await miningSuite(accounts);
+}
+
+async function miningSuite(accounts: any[]) {
+    const user0 = accounts[0]
+    const mcb = { address: "0xa0a45f2b616a740c3c7a7ff69be893f61e6455e3" }
+
+    const xmcb = await createContract("XMCB");
+    await xmcb.initialize(user0.address, mcb.address, toWei("0.05"))
+
+    const rewardDistrubution = await createContract("RewardDistribution", [user0.address, xmcb.address]);
+    await xmcb.addComponent(rewardDistrubution.address);
+
+    await rewardDistrubution.createRewardPlan(mcb.address, toWei("0.06"));
+    await rewardDistrubution.notifyRewardAmount(mcb.address, toWei("300000"));
+
+    console.table([
+        ["mcb", mcb.address],
+        ["xmcb", xmcb.address],
+        ["mining", rewardDistrubution.address],
+    ])
+}
+
+
+async function voteSuite(accounts: any[]) {
     const user0 = accounts[0]
     // mcb
     const mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);

@@ -12,7 +12,7 @@ contract TestGovernorAlpha is GovernorAlpha {
         address timelock_,
         address comp_,
         address guardian_
-    ) public GovernorAlpha(timelock_, comp_, guardian_) {}
+    ) GovernorAlpha(timelock_, comp_, guardian_) {}
 
     function skipBlock(uint256 count) public {
         if (mockBlockNumber == 0) {
