@@ -3,17 +3,23 @@ pragma solidity 0.7.4;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721HolderUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 // import "./libraries/SafeOwnable.sol";
 
 import "hardhat/console.sol";
 
-contract Vault is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC721HolderUpgradeable {
+contract Vault is
+    Initializable,
+    OwnableUpgradeable,
+    ERC721HolderUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     // using SafeMathUpgradeable for uint256;
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
@@ -26,10 +32,11 @@ contract Vault is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC721H
     function initialize(address owner_) external initializer {
         __Ownable_init();
         __Ownable_init_unchained();
+
         transferOwnership(owner_);
     }
 
-    function transferEther(address to, uint256 value) external onlyOwner {
+    function transferEther(address to, uint256 value) external onlyOwner nonReentrant {
         AddressUpgradeable.sendValue(payable(to), value);
     }
 
@@ -37,7 +44,7 @@ contract Vault is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC721H
         address tokenAddress,
         address to,
         uint256 value
-    ) external onlyOwner {
+    ) external onlyOwner nonReentrant {
         IERC20Upgradeable(tokenAddress).transfer(to, value);
     }
 
@@ -45,19 +52,16 @@ contract Vault is Initializable, ContextUpgradeable, OwnableUpgradeable, ERC721H
         address tokenAddress,
         address to,
         uint256 value
-    ) external onlyOwner {
-        IERC20Upgradeable token = IERC20Upgradeable(tokenAddress);
-        uint256 balance = token.balanceOf(address(this));
-        IERC20Upgradeable(token).transfer(to, value);
-        require(balance.sub(token.balanceOf(address(this))) == value, "balance mismatch");
+    ) external onlyOwner nonReentrant {
+        IERC20Upgradeable(tokenAddress).transfer(to, value);
     }
 
     function execute(
         address to,
         bytes calldata data,
         uint256 value
-    ) external onlyOwner {
+    ) external onlyOwner nonReentrant {
         AddressUpgradeable.functionCallWithValue(to, data, value);
-        emit ExecuteTransaction(_msgSender(), to, data, value);
+        emit ExecuteTransaction(msg.sender, to, data, value);
     }
 }

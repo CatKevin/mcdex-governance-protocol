@@ -1,60 +1,50 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.7.4;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-// import "./libraries/SafeOwnable.sol";
-import "./interfaces/IUSDConvertor.sol";
-
-import "hardhat/console.sol";
+import "./libraries/TokenConversion.sol";
+import "./Guardianship.sol";
 
 interface IDecimals {
     function decimals() external view returns (uint8);
 }
 
-struct USDTokenInfo {
-    uint256 scaler;
-    uint256 cumulativeCapturedBalance;
-}
-
-contract ValueCapture is Initializable, ContextUpgradeable, OwnableUpgradeable {
+contract ValueCapture is Initializable, Guardianship {
     using SafeMathUpgradeable for uint256;
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
+    using TokenConversion for TokenEntry;
 
-    uint256 private constant SYSTEM_DECIMALS = 18;
+    uint256 public constant SYSTEM_DECIMALS = 18;
 
     address public vault;
-    address public guardian;
     uint256 public totalCapturedUSD;
+    mapping(address => TokenEntry) public assetEntries;
 
-    EnumerableSetUpgradeable.AddressSet internal _usdTokens;
-    mapping(address => USDTokenInfo) internal _usdTokenInfos;
-    mapping(address => IUSDConvertor) internal _usdTokenConverters;
+    EnumerableSetUpgradeable.AddressSet internal _usdTokenList;
+    mapping(address => uint256) internal _normalizer;
 
-    event AddUSDToken(address indexed tokenAddresss);
-    event RemoveUSDToken(address indexed tokenAddresss);
-    event SetUSDConverter(address indexed tokenAddress, address indexed converter);
-    event ConvertToUSD(
+    event AddUSDToken(address indexed usdToken);
+    event RemoveUSDToken(address indexed usdToken);
+    event SetConvertor(address indexed tokenAddress, address indexed convertor);
+    event ConvertToken(
         address indexed tokenIn,
         uint256 balanceIn,
         address indexed tokenOut,
         uint256 balanceOut
     );
-    event TranferToVault(address indexed tokenAddress, uint256 amount);
-    event SetGuardian(address indexed previousGuardian, address indexed newGuardian);
-
-    modifier onlyGuardian() {
-        require(_msgSender() == guardian, "caller must be guardian");
-        _;
-    }
+    event ForwardAsset(address indexed tokenOut, uint256 amountOut, uint256 normalizeAmountOut);
+    event ForwardERC20Token(address indexed tokenOut, uint256 amount);
+    event ForwardERC721Token(address indexed tokenOut, uint256 tokenID);
+    event ForwardNativeValue(uint256 amount);
 
     receive() external payable {}
 
@@ -67,60 +57,22 @@ contract ValueCapture is Initializable, ContextUpgradeable, OwnableUpgradeable {
      */
     function initialize(address vault_, address owner_) external initializer {
         __Context_init_unchained();
-        __Ownable_init_unchained();
+
         vault = vault_;
         transferOwnership(owner_);
-    }
-
-    /**
-     * @notice  Get total count of USD token in whitelist.
-     */
-    function getUSDTokenCount() public view returns (uint256) {
-        return _usdTokens.length();
-    }
-
-    /**
-     * @notice  Get address of USD token in whitelist by index.
-     *
-     * @param   index   The index of USD token address to retrieve.
-     */
-    function getUSDToken(uint256 index) public view returns (address) {
-        return _usdTokens.at(index);
+        transferGuardianship(owner_);
     }
 
     /**
      * @notice  Return all addresses of USD tokens in whitelist as an array.
      */
-    function getAllUSDTokens() public view returns (address[] memory) {
-        uint256 tokenCount = _usdTokens.length();
+    function getUSDTokens() public view returns (address[] memory) {
+        uint256 tokenCount = _usdTokenList.length();
         address[] memory results = new address[](tokenCount);
         for (uint256 i = 0; i < tokenCount; i++) {
-            results[i] = _usdTokens.at(i);
+            results[i] = _usdTokenList.at(i);
         }
         return results;
-    }
-
-    /**
-     * @notice  Get scaler and cumulative captured balance of usd token.
-     *          Removing a USD token will not clean its existing data.
-     *
-     * @param   token   The address of USD token.
-     */
-    function getUSDTokenInfo(address token) public view returns (uint256, uint256) {
-        USDTokenInfo storage info = _usdTokenInfos[token];
-        return (info.scaler, info.cumulativeCapturedBalance);
-    }
-
-    /**
-     * @notice  Set guardian of value capture contract.
-     *          The guaridan is able to call method to sell tokens for USD.
-     *
-     * @param   newGuardian The address of new guardian.
-     */
-    function setGuardian(address newGuardian) public onlyOwner {
-        require(newGuardian != guardian, "new guardian is already guardian");
-        emit SetGuardian(guardian, newGuardian);
-        guardian = newGuardian;
     }
 
     /**
@@ -131,20 +83,20 @@ contract ValueCapture is Initializable, ContextUpgradeable, OwnableUpgradeable {
      * @param   token       The address of usd token to be put into whitelist.
      * @param   decimals    The decimals of token.
      */
-    function setUSDToken(address token, uint256 decimals) public onlyOwner {
+    function addUSDToken(address token, uint256 decimals) public onlyOwner {
+        require(!_usdTokenList.contains(token), "token already in usd list");
         require(token.isContract(), "token address must be contract");
-        require(!_usdTokens.contains(token), "token already in usd list");
         require(decimals >= 0 && decimals <= 18, "decimals out of range");
-
+        // verify decimals if possible
         try IDecimals(token).decimals() returns (uint8 actualDecimals) {
             require(actualDecimals == decimals, "decimals not match");
         } catch {}
 
-        bool isAdded = _usdTokens.add(token);
+        bool isAdded = _usdTokenList.add(token);
         require(isAdded, "fail to add token to list");
 
-        uint256 factor = 10**(SYSTEM_DECIMALS.sub(decimals));
-        _usdTokenInfos[token].scaler = (factor == 0 ? 1 : factor);
+        uint256 normalizer = 10**(SYSTEM_DECIMALS.sub(decimals));
+        _normalizer[token] = normalizer;
 
         emit AddUSDToken(token);
     }
@@ -154,111 +106,119 @@ contract ValueCapture is Initializable, ContextUpgradeable, OwnableUpgradeable {
      *
      * @param   token   The address of USD token to remove.
      */
-    function unsetUSDToken(address token) public onlyOwner {
-        require(_usdTokens.contains(token), "token not in usd list");
+    function removeUSDToken(address token) public onlyOwner {
+        require(_usdTokenList.contains(token), "token not in usd list");
 
-        bool isRemoved = _usdTokens.remove(token);
+        bool isRemoved = _usdTokenList.remove(token);
         require(isRemoved, "fail to remove token from list");
-        // leave _usdTokenInfos unremoved
 
         emit RemoveUSDToken(token);
     }
 
     /**
-     * @notice  Add a 'converter' for some token.
-     *          A converter is known as a external contract who has an interface to accept some kind of token
+     * @notice  Add a 'convertor' for some token.
+     *          A convertor is known as a external contract who has an interface to accept some kind of token
      *          and return USD token in value capture's whitelist.
-     *          That means the output token of converter must be in the whitelist.
-     *          See contract/interfaces/IUSDConvertor.sol for interface spec of a converter.
+     *          That means the output token of convertor must be in the whitelist.
+     *          See contract/interfaces/IUSDConvertor.sol for interface spec of a convertor.
      *
-     * @param   token       The address of any token accepted by converter.
-     * @param   converter   The address of converter contract.
+     * @param   token               The address of any token accepted by convertor.
+     * @param   oracle              The address of oracle to read reference token price in USD.
+     * @param   convertor_          The address of convertor contract.
+     * @param   slippageTolerance   The max slippage can be accepted when convert token to USD, 100% = 1e18;
      */
-    function setUSDConverter(address token, address converter) public onlyOwner {
-        require(converter.isContract(), "converter must be contract");
-        IUSDConvertor convertor = IUSDConvertor(converter);
-        require(_usdTokens.contains(convertor.tokenOut()), "token out not in list");
-        _usdTokenConverters[token] = IUSDConvertor(converter);
+    function setConvertor(
+        address token,
+        address oracle,
+        address convertor_,
+        uint256 slippageTolerance
+    ) public onlyOwner {
+        require(slippageTolerance <= 1e18, "slippage tolerance is out of range");
+        require(convertor_.isContract(), "convertor must be contract");
 
-        emit SetUSDConverter(token, converter);
+        IUSDConvertor convertor = IUSDConvertor(convertor_);
+        require(_usdTokenList.contains(convertor.tokenOut()), "token out is not in usd list");
+        // set or update, leave cum amount unchanged
+        assetEntries[token] = TokenEntry({
+            oracle: ITWAPOracle(oracle),
+            convertor: convertor,
+            slippageTolerance: slippageTolerance,
+            cumulativeConvertedAmount: assetEntries[token].cumulativeConvertedAmount
+        });
+
+        emit SetConvertor(token, convertor_);
     }
 
-    function collectToken(address token) public onlyGuardian {
+    function forwardAsset(address token) public onlyGuardian {
         require(vault != address(0), "vault is not set");
 
-        (address tokenOut, uint256 balanceOut) = _convertTokenToUSD(token);
-        require(_usdTokens.contains(tokenOut), "unexpected out token");
+        (address tokenOut, uint256 amountOut) = _convertTokenToUSD(token);
+        require(_usdTokenList.contains(tokenOut), "unexpected out token");
 
-        USDTokenInfo storage info = _usdTokenInfos[tokenOut];
-        uint256 normalizeOutBalance = balanceOut.mul(info.scaler);
-        totalCapturedUSD = totalCapturedUSD.add(normalizeOutBalance);
-        info.cumulativeCapturedBalance = info.cumulativeCapturedBalance.add(normalizeOutBalance);
-        IERC20Upgradeable(tokenOut).safeTransfer(vault, balanceOut);
+        uint256 normalizer = _normalizer[token];
+        require(normalizer != 0, "unexpected normalizer");
+        uint256 normalizeAmountOut = amountOut.mul(normalizer);
+        totalCapturedUSD = totalCapturedUSD.add(normalizeAmountOut);
+        IERC20Upgradeable(tokenOut).safeTransfer(vault, amountOut);
 
-        emit TranferToVault(tokenOut, balanceOut);
+        emit ForwardAsset(tokenOut, amountOut, normalizeAmountOut);
     }
 
     /**
-     * @notice  This method is should not be called if there are any converter available for given ERC20 token.
-     *          But if there is really not, or the converter is lack of enough liquidity,
+     * @notice  This method is should not be called if there are any convertor available for given ERC20 token.
+     *          But if there is really not, or the convertor is lack of enough liquidity,
      *          guardian will be able to send the asset to vault for other usage.
      *
      *          **Asset sent though this method to vault will not affect mintable amount of MCB.**
      */
-    function collectERC20Token(address token, uint256 amount) public onlyGuardian {
+    function forwardERC20Token(address token, uint256 amount) public onlyGuardian {
         require(vault != address(0), "vault is not set");
         IERC20Upgradeable(token).safeTransfer(vault, amount);
+        emit ForwardERC20Token(token, amount);
     }
 
     /**
-     * @notice  This method has the same usage as `collectERC20Token`.
+     * @notice  This method has the same usage as `forwardERC20Token`.
      *
      *          **Asset sent though this method to vault will not affect mintable amount of MCB.**
      */
-    function collectERC721Token(address token, uint256 tokenID) public onlyGuardian {
+    function forwardERC721Token(address token, uint256 tokenID) public onlyGuardian {
         require(vault != address(0), "vault is not set");
         IERC721Upgradeable(token).safeTransferFrom(address(this), vault, tokenID);
+        emit ForwardERC721Token(token, tokenID);
     }
 
     /**
-     * @notice  This method has the same usage as `collectERC20Token`.
+     * @notice  This method has the same usage as `forwardERC20Token`.
      *
      *          **Asset sent though this method to vault will not affect mintable amount of MCB.**
      */
-    function collectNativeCurrency(uint256 amount) public onlyGuardian {
+    function forwardNativeCurrency(uint256 amount) public onlyGuardian {
         require(vault != address(0), "vault is not set");
         AddressUpgradeable.sendValue(payable(vault), amount);
-        console.log("DEBUG enter collectNativeCurrency", amount);
+        emit ForwardNativeValue(amount);
     }
 
     function _convertTokenToUSD(address tokenIn)
         internal
-        returns (address tokenOut, uint256 balanceOut)
+        returns (address tokenOut, uint256 amountOut)
     {
-        uint256 balanceIn = IERC20Upgradeable(tokenIn).balanceOf(address(this));
-        if (balanceIn == 0) {
+        uint256 amountIn = IERC20Upgradeable(tokenIn).balanceOf(address(this));
+        if (amountIn == 0) {
             // early revert
             revert("no balance to convert");
-        } else if (_usdTokens.contains(tokenIn)) {
+        } else if (_usdTokenList.contains(tokenIn)) {
             // if the token to be converted is USD token in whitelist
             // directly return the input amount
             tokenOut = tokenIn;
-            balanceOut = balanceIn;
+            amountOut = amountIn;
         } else {
-            IUSDConvertor converter = _usdTokenConverters[tokenIn];
-            require(address(converter) != address(0), "token has no converter");
-            tokenOut = converter.tokenOut();
-            require(_usdTokens.contains(tokenOut), "converted usd not in list");
+            IUSDConvertor convertor = assetEntries[tokenIn].convertor;
+            require(address(convertor) != address(0), "token has no convertor");
             // not necessary, but double check to prevent unexpected nested call.
-            uint256 prevBalance = IERC20Upgradeable(tokenOut).balanceOf(address(this));
-            {
-                IERC20Upgradeable(tokenIn).approve(address(converter), balanceIn);
-                balanceOut = converter.covertToUSD(balanceIn);
-            }
-            uint256 postBalance = IERC20Upgradeable(tokenOut).balanceOf(address(this));
-            require(postBalance.sub(prevBalance) == balanceOut, "converted balance not match");
+            amountOut = convertor.convert(amountIn);
         }
-        require(balanceOut > 0, "balance out is 0");
-        emit ConvertToUSD(tokenIn, balanceIn, tokenOut, balanceOut);
+        require(amountOut > 0, "balance out is 0");
+        emit ConvertToken(tokenIn, amountIn, tokenOut, amountOut);
     }
 }

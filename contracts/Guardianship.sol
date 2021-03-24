@@ -3,13 +3,18 @@ pragma solidity 0.7.4;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
 contract Guardianship is ContextUpgradeable, OwnableUpgradeable {
     address private _guardian;
 
     event GuardianshipTransferred(address indexed previousGuardian, address indexed newGuardian);
 
-    constructor() {}
+    function __Guardianship_init_unchained() internal initializer {
+        address msgSender = _msgSender();
+        _guardian = msgSender;
+        emit GuardianshipTransferred(address(0), msgSender);
+    }
 
     function guardian() public view virtual returns (address) {
         return _guardian;
