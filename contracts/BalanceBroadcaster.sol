@@ -24,6 +24,10 @@ contract BalanceBroadcaster is Initializable {
         return _components.length();
     }
 
+    function isComponent(address component) public view returns (bool) {
+        return _components.contains(component);
+    }
+
     function listComponents(uint256 begin, uint256 end)
         public
         view

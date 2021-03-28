@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
+import "../../interfaces/IAuthenticator.sol";
 import "hardhat/console.sol";
 
 interface IXMCB is IERC20 {
@@ -23,7 +24,11 @@ contract RewardDistribution is Context, Ownable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    bytes32 public constant REWARD_DISTRIBUTION_ADMIN_ROLE =
+        keccak256("REWARD_DISTRIBUTION_ADMIN_ROLE");
+
     IXMCB public xMCB;
+    IAuthenticator public authenticator;
 
     struct RewardPlan {
         IERC20 rewardToken;
@@ -42,6 +47,14 @@ contract RewardDistribution is Context, Ownable {
     event RewardRateChanged(uint256 previousRate, uint256 currentRate, uint256 periodFinish);
     event RewardPlanCreated(address indexed token, uint256 rewardRate);
 
+    modifier onlyAuthorized() {
+        require(
+            authenticator.hasRoleOrAdmin(REWARD_DISTRIBUTION_ADMIN_ROLE, msg.sender),
+            "caller is not authorized"
+        );
+        _;
+    }
+
     modifier updateReward(address token, address account) {
         _updateReward(token, account);
         _;
@@ -52,8 +65,8 @@ contract RewardDistribution is Context, Ownable {
         _;
     }
 
-    constructor(address owner_, address xMCB_) Ownable() {
-        transferOwnership(owner_);
+    constructor(address authenticator_, address xMCB_) Ownable() {
+        authenticator = IAuthenticator(authenticator_);
         xMCB = IXMCB(xMCB_);
     }
 
@@ -89,7 +102,7 @@ contract RewardDistribution is Context, Ownable {
         return address(_rewardPlans[token].rewardToken) != address(0);
     }
 
-    function createRewardPlan(address token, uint256 rewardRate) public onlyOwner {
+    function createRewardPlan(address token, uint256 rewardRate) public onlyAuthorized {
         require(token != address(0), "invalid reward token");
         require(token.isContract(), "reward token must be contract");
         require(!hasPlan(token), "plan already exists");
@@ -122,7 +135,7 @@ contract RewardDistribution is Context, Ownable {
     function setRewardRate(address token, uint256 newRewardRate)
         public
         virtual
-        onlyOwner
+        onlyAuthorized
         onlyOnExistPlan(token)
         updateReward(token, address(0))
     {
@@ -150,7 +163,7 @@ contract RewardDistribution is Context, Ownable {
     function notifyRewardAmount(address token, uint256 reward)
         public
         virtual
-        onlyOwner
+        onlyAuthorized
         onlyOnExistPlan(token)
         updateReward(token, address(0))
     {

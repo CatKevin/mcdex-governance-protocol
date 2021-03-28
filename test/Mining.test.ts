@@ -13,6 +13,7 @@ describe('Minging', () => {
     let user1;
     let user2;
     let user3;
+    let auth;
 
     before(async () => {
         accounts = await getAccounts();
@@ -21,20 +22,17 @@ describe('Minging', () => {
         user2 = accounts[2];
         user3 = accounts[3];
 
-        console.log("user0", user0.address)
-        console.log("user1", user1.address)
-        console.log("user2", user2.address)
-        console.log("user3", user3.address)
+        auth = await createContract("Authenticator");
+        await auth.initialize();
     })
 
     it("mining list", async () => {
-
         const usd1 = await createContract("CustomERC20", ["USD", "USD", 18]);
         const usd2 = await createContract("CustomERC20", ["USD", "USD", 6]);
 
         const mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
         const xmcb = await createContract("XMCB");
-        await xmcb.initialize(user0.address, mcb.address, toWei("0.05"));
+        await xmcb.initialize(auth.address, mcb.address, toWei("0.05"));
 
         const rewardDistrubution1 = await createContract("TestRewardDistribution", [user0.address, xmcb.address]);
         const rewardDistrubution2 = await createContract("TestRewardDistribution", [user0.address, xmcb.address]);
@@ -74,7 +72,7 @@ describe('Minging', () => {
 
         const mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
         const xmcb = await createContract("XMCB");
-        await xmcb.initialize(user0.address, mcb.address, toWei("0.05"));
+        await xmcb.initialize(auth.address, mcb.address, toWei("0.05"));
 
         const rewardDistrubution = await createContract("TestRewardDistribution", [user0.address, xmcb.address]);
         await xmcb.addComponent(rewardDistrubution.address);

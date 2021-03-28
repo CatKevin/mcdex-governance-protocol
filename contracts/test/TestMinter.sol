@@ -10,10 +10,24 @@ contract TestMinter is Minter {
     constructor(
         address mcbToken_,
         address valueCapture_,
+        address seriesA_,
         address devAccount_,
-        Release memory default_,
-        Release memory seriesA_
-    ) Minter(mcbToken_, valueCapture_, devAccount_, default_, seriesA_) {}
+        uint256 baseMaxSupply_,
+        uint256 seriesAMaxSupply_,
+        uint256 baseMinReleaseRate_,
+        uint256 seriesAMaxReleaseRate_
+    )
+        Minter(
+            mcbToken_,
+            valueCapture_,
+            seriesA_,
+            devAccount_,
+            baseMaxSupply_,
+            seriesAMaxSupply_,
+            baseMinReleaseRate_,
+            seriesAMaxReleaseRate_
+        )
+    {}
 
     function setBlockNumber(uint256 blockNumber) public {
         _mockBlockNumber = blockNumber;

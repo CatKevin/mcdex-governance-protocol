@@ -17,63 +17,91 @@ interface IMCB is IERC20Upgradeable {
     function mint(address account, uint256 amount) external;
 }
 
+interface L2Caller {
+    function l2Sender() public view returns (address);
+}
+
 contract Minter {
     using AddressUpgradeable for address;
-
     using MathUpgradeable for uint256;
     using SafeMathUpgradeable for uint256;
 
-    uint256 public constant TOTAL_SUPPLY = 10000000 * 1e18; // 10,000,000
-    uint256 public constant DEV_COMMISSION_RATE = 25 * 1e16; // 25%
-    uint256 public constant GENESIS_BLOCK = 0;
+    enum ReleaseType { NoneType, ReleaseToL1, ReleaseToArbL2 }
 
-    struct Release {
+    struct ReleaseReceipt {
+        ReleaseType releaseType;
+        bool executed;
         address recipient;
-        uint256 releaseRate;
-        uint256 mintableAmount;
-        uint256 mintedAmount;
-        uint256 maxSupply;
-        uint256 lastCapturedBlock;
+        uint256 amount;
     }
+
+    address public devAccount;
+    address public seriesA;
+
+    uint256 public totalCapturedValue;
+    uint256 public lastValueCapturedBlock;
+
+    uint256 public baseMaxSupply;
+    uint256 public baseMintedAmount;
+    uint256 public baseMinReleaseRate;
+    uint256 public extraMintableAmount;
+
+    uint256 public seriesAMaxSupply;
+    uint256 public seriesAMintableAmount;
+    uint256 public seriesAMintedAmount;
+    uint256 public seriesAMaxReleaseRate;
+    uint256 public seriesALastUpdateBlock;
 
     IMCB public mcbToken;
     IValueCapture public valueCapture;
-
-    address public devAccount;
-    uint256 public lastCaptureValue;
-    uint256 public extraMintableAmount;
-    uint256 public totalCapturedValue;
-
-    Release public toVault;
-    Release public toSeriesA;
+    ReleaseReceipt[] public releaseReceipts;
 
     event MintMCB(
         address indexed recipient,
-        uint256 amount,
         uint256 recipientReceivedAmount,
+        address indexed devAccount,
         uint256 devReceivedAmount
     );
-
     event SetDevAccount(address indexed devOld, address indexed devNew);
+    event RequestFromL2();
 
     constructor(
         address mcbToken_,
         address valueCapture_,
+        address seriesA_,
         address devAccount_,
-        Release memory toVault_,
-        Release memory toSeriesA_
+        uint256 baseMaxSupply_,
+        uint256 seriesAMaxSupply_,
+        uint256 baseMinReleaseRate_,
+        uint256 seriesAMaxReleaseRate_
     ) {
         require(mcbToken_.isContract(), "token must be contract");
         require(valueCapture_.isContract(), "value capture must be contract");
+
         mcbToken = IMCB(mcbToken_);
         valueCapture = IValueCapture(valueCapture_);
-
+        seriesA = seriesA_;
         devAccount = devAccount_;
+        require(
+            baseMaxSupply_.add(seriesAMaxSupply_).add(mcbToken.totalSupply()) <= mcbTotalSupply(),
+            "base + series-a exceeds total supply"
+        );
+        baseMaxSupply = baseMaxSupply_;
+        seriesAMaxSupply = seriesAMaxSupply_;
+        baseMinReleaseRate = baseMinReleaseRate_;
+        seriesAMaxReleaseRate = seriesAMaxReleaseRate_;
+    }
 
-        toVault = toVault_;
-        toVault.lastCapturedBlock = GENESIS_BLOCK;
-        toSeriesA = toSeriesA_;
-        toSeriesA.lastCapturedBlock = GENESIS_BLOCK;
+    function genesisBlock() public pure virtual returns (uint256) {
+        return 0;
+    }
+
+    function mcbTotalSupply() public pure virtual returns (uint256) {
+        return 10000000 * 1e18; // 10,000,000
+    }
+
+    function devCommissionRate() public pure virtual returns (uint256) {
+        return 25 * 1e16; // 25%
     }
 
     function setDevAccount(address devAccount_) external {
@@ -83,79 +111,123 @@ contract Minter {
         devAccount = devAccount_;
     }
 
-    function getMintableAmountToSeriesA() public returns (uint256) {
+    function getSeriesAMintableAmount() public returns (uint256) {
         updateMintableAmount();
-        return toSeriesA.mintableAmount;
+        return seriesAMintableAmount.min(seriesAMaxSupply);
     }
 
-    function getMintableAmountToVault() public returns (uint256) {
+    function getBaseMintableAmount() public returns (uint256) {
         updateMintableAmount();
-        return toVault.mintableAmount;
+        return _getBaseMintableAmount().min(baseMaxSupply);
     }
 
-    function mintToSeriesA(uint256 amount) public {
-        _mint(toSeriesA, amount);
+    function seriesAMint(uint256 amount) public {
+        updateMintableAmount();
+        require(amount <= _getBaseMintableAmount(), "amount exceeds max mintable amount");
+        _mint(seriesA, amount);
+
+        seriesAMintedAmount = seriesAMintedAmount.add(amount);
+        require(seriesAMintedAmount <= seriesAMaxSupply, "minted amount exceeds max supply");
     }
 
-    function mintToVault(uint256 amount) public {
-        _mint(toVault, amount);
+    function l2Mint() public {
+        L2Caller l2Caller = L2Caller(msg.sender);
+        require(msg.sender == address(0x0000000000000000000000000000000000000000), "");
+        require(l2Caller.l2Sender() == address(0x0000000000000000000000000000000000000000), "");
+        uint256 newIndex = releaseReceipts.length;
+        releaseReceipts[newIndex] = ReleaseReceipt({
+            releaseType: ReleaseToL1,
+            executed: false,
+            recipient: address(0x0000000000000000000000000000000000000000),
+            amount: 0
+        });
+        emit RequestFromL2();
     }
 
-    function _mint(Release storage release, uint256 amount) internal {
+    function baseMint(uint256 receiptIndex) public {
+        ReleaseReceipt storage receipt = releaseReceipts[receiptIndex];
+        require(receipt.releaseType != ReleaseType.NoneType && !receipt.executed, "");
+        _baseMint(receipt.recipient, receipt.amount);
+        receipt.executed = true;
+    }
+
+    function _baseMint(address recipient, uint256 amount) internal {
+        updateMintableAmount();
+        require(amount <= _getBaseMintableAmount(), "amount exceeds max mintable amount");
+        _mint(recipient, amount);
+        baseMintedAmount = baseMintedAmount.add(amount);
+        require(baseMintedAmount <= baseMaxSupply, "minted amount exceeds max supply");
+    }
+
+    function _mint(address recipient, uint256 amount) internal {
         require(amount > 0, "amount is zero");
+        require(
+            mcbToken.totalSupply().add(amount) <= mcbTotalSupply(),
+            "mint amount exceeds total supply"
+        );
 
-        updateMintableAmount();
-        require(amount <= release.mintableAmount, "amount exceeds mintable");
-
-        uint256 toDevAmount = amount.mul(DEV_COMMISSION_RATE).div(1e18);
+        uint256 toDevAmount = amount.mul(devCommissionRate()).div(1e18);
         uint256 toRecipientAmount = amount.sub(toDevAmount);
+        mcbToken.mint(recipient, toRecipientAmount);
         mcbToken.mint(devAccount, toDevAmount);
-        mcbToken.mint(release.recipient, toRecipientAmount);
-        release.mintableAmount = release.mintableAmount.sub(amount);
-        release.mintedAmount = release.mintedAmount.add(amount);
 
-        require(release.mintedAmount <= release.maxSupply, "minted exceeds release supply");
-        require(mcbToken.totalSupply() <= TOTAL_SUPPLY, "minted exceeds total supply");
-
-        emit MintMCB(release.recipient, amount, toRecipientAmount, toDevAmount);
+        emit MintMCB(recipient, toRecipientAmount, devAccount, toDevAmount);
     }
 
-    function updateSeriesAMintableAmount() internal {
-        if (_getBlockNumber() <= toSeriesA.lastCapturedBlock || extraMintableAmount == 0) {
+    function updateMintableAmount() public {
+        _updateExtraMintableAmount();
+        updateSeriesAMintableAmount();
+    }
+
+    function updateSeriesAMintableAmount() public {
+        if (_getBlockNumber() <= seriesALastUpdateBlock || extraMintableAmount == 0) {
             return;
         }
-        uint256 remainSupply =
-            toSeriesA.maxSupply.sub(toSeriesA.mintedAmount).sub(toSeriesA.mintableAmount);
+        uint256 remainSupply = seriesAMaxSupply.sub(seriesAMintedAmount).sub(seriesAMintableAmount);
         if (remainSupply == 0) {
             return;
         }
-        uint256 elapsedBlock = _getBlockNumber().sub(toSeriesA.lastCapturedBlock);
-        uint256 mintableAmountToSeriesA =
-            elapsedBlock.mul(toSeriesA.releaseRate).min(extraMintableAmount).min(remainSupply);
+        uint256 elapsedBlock = _getBlockNumber().sub(seriesALastUpdateBlock);
+        uint256 mintableAmount =
+            elapsedBlock.mul(seriesAMaxReleaseRate).min(extraMintableAmount).min(remainSupply);
         // **TO SERIES A**: extra
-        toSeriesA.mintableAmount = toSeriesA.mintableAmount.add(mintableAmountToSeriesA);
-        extraMintableAmount = extraMintableAmount.sub(mintableAmountToSeriesA);
-        toSeriesA.lastCapturedBlock = _getBlockNumber();
+        seriesAMintableAmount = seriesAMintableAmount.add(mintableAmount);
+        extraMintableAmount = extraMintableAmount.sub(mintableAmount);
+        seriesALastUpdateBlock = _getBlockNumber();
     }
 
-    function updateVaultMintableAmount() internal {
-        if (_getBlockNumber() > toVault.lastCapturedBlock) {
+    function _updateExtraMintableAmount() internal {
+        if (_getBlockNumber() <= _getLastValueCapturedBlock()) {
             return;
         }
         uint256 capturedValue = valueCapture.totalCapturedUSD();
         uint256 incrementalCapturedValue = capturedValue.sub(totalCapturedValue);
-        uint256 elapsedBlock = _getBlockNumber().sub(toVault.lastCapturedBlock);
-        uint256 minMintableAmount = elapsedBlock.mul(toVault.releaseRate); // **NOT** 1e18 mul
-        if (incrementalCapturedValue > minMintableAmount) {
-            extraMintableAmount = incrementalCapturedValue.sub(minMintableAmount);
+        {
+            uint256 elapsedBlock = _getBlockNumber().sub(_getLastValueCapturedBlock());
+            uint256 baseMintableAmount = elapsedBlock.mul(baseMinReleaseRate);
+            if (incrementalCapturedValue > baseMintableAmount) {
+                extraMintableAmount = incrementalCapturedValue.sub(baseMintableAmount);
+            }
+            lastValueCapturedBlock = _getBlockNumber();
         }
-        toVault.lastCapturedBlock = _getBlockNumber();
         totalCapturedValue = capturedValue;
     }
 
-    function updateMintableAmount() internal {
-        updateVaultMintableAmount();
-        updateSeriesAMintableAmount();
+    function _getLastValueCapturedBlock() internal view returns (uint256) {
+        return lastValueCapturedBlock < genesisBlock() ? genesisBlock() : lastValueCapturedBlock;
+    }
+
+    function _getSeriesALastUpdateBlock() internal view returns (uint256) {
+        return seriesALastUpdateBlock < genesisBlock() ? genesisBlock() : seriesALastUpdateBlock;
+    }
+
+    function _getBaseMintableAmount() internal view returns (uint256) {
+        uint256 cumulativeMintableAmount =
+            baseMinReleaseRate.mul(_getBlockNumber().sub(genesisBlock())).add(extraMintableAmount);
+        return
+            cumulativeMintableAmount > baseMintedAmount
+                ? cumulativeMintableAmount.sub(baseMintedAmount)
+                : 0;
     }
 
     function _getBlockNumber() internal view virtual returns (uint256) {
