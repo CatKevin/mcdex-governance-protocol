@@ -16,6 +16,7 @@ contract ConstantSeller {
 
     address public owner;
     uint256 public price;
+    uint256 public normalizedPrice;
 
     IERC20 public tokenIn;
     IERC20 public tokenOut;
@@ -28,6 +29,7 @@ contract ConstantSeller {
         owner = msg.sender;
         tokenIn = IERC20(tokenIn_);
         tokenOut = IERC20(tokenOut_);
+        normalizedPrice = price_;
 
         uint8 decimalsIn = IDecimals(tokenIn_).decimals();
         uint8 decimalsOut = IDecimals(tokenOut_).decimals();
@@ -45,13 +47,13 @@ contract ConstantSeller {
         price = price_;
     }
 
-    function covertToUSD(uint256 amount) public returns (uint256) {
+    function convert(uint256 amount) public returns (uint256, uint256) {
         require(price != 0, "no price");
         require(amount > 0, "0 amount");
 
         uint256 amountToReturn = (amount * price) / 1e18;
         tokenIn.transferFrom(msg.sender, address(this), amount);
         tokenOut.transfer(msg.sender, amountToReturn);
-        return amountToReturn;
+        return (normalizedPrice, amountToReturn);
     }
 }

@@ -5,14 +5,18 @@ pragma experimental ABIEncoderV2;
 import "../GovernorAlpha.sol";
 
 contract TestGovernorAlpha is GovernorAlpha {
+    address public mockMCB;
     uint256 public mockBlockNumber;
     uint256 public mockBlockTimestamp;
 
     constructor(
+        address mcb_,
         address timelock_,
         address comp_,
         address guardian_
-    ) GovernorAlpha(timelock_, comp_, guardian_) {}
+    ) GovernorAlpha(timelock_, comp_, guardian_) {
+        mockMCB = mcb_;
+    }
 
     function skipBlock(uint256 count) public {
         if (mockBlockNumber == 0) {
@@ -21,11 +25,8 @@ contract TestGovernorAlpha is GovernorAlpha {
         mockBlockNumber = mockBlockNumber + count;
     }
 
-    function getBlockNumber() internal view virtual override returns (uint256) {
-        if (mockBlockNumber > 0) {
-            return mockBlockNumber;
-        }
-        return block.number;
+    function setBlockNumber(uint256 blockNumber) public {
+        mockBlockNumber = blockNumber;
     }
 
     function setTimestamp(uint256 newTimestamp) public {
@@ -39,10 +40,15 @@ contract TestGovernorAlpha is GovernorAlpha {
         mockBlockTimestamp = mockBlockTimestamp + nSeconds;
     }
 
-    function getBlockTimestamp() internal view virtual override returns (uint256) {
-        if (mockBlockTimestamp > 0) {
-            return mockBlockTimestamp;
-        }
-        return block.timestamp;
+    function _getBlockNumber() internal view virtual override returns (uint256) {
+        return mockBlockNumber == 0 ? block.number : mockBlockNumber;
+    }
+
+    function _getBlockTimestamp() internal view virtual override returns (uint256) {
+        return mockBlockTimestamp == 0 ? block.timestamp : mockBlockTimestamp;
+    }
+
+    function _getMCBToken() internal view virtual override returns (IERC20Upgradeable) {
+        return IERC20Upgradeable(mockMCB);
     }
 }

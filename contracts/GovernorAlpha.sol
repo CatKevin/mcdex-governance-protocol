@@ -13,12 +13,12 @@ contract GovernorAlpha {
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
     function quorumVotes() public view returns (uint256) {
-        return IERC20Upgradeable(MCB_TOKEN_ADDRESS).totalSupply() / 10;
+        return _getMCBToken().totalSupply() / 10;
     } // 10% of mcb (current totalSupply)
 
     /// @notice The number of votes required in order for a voter to become a proposer
     function proposalThreshold() public view returns (uint256) {
-        return IERC20Upgradeable(MCB_TOKEN_ADDRESS).totalSupply() / 100;
+        return _getMCBToken().totalSupply() / 100;
     } // 100,000 = 1% of mcb (current totalSupply)
 
     /// @notice The maximum number of actions that can be included in a proposal
@@ -151,7 +151,7 @@ contract GovernorAlpha {
         string memory description
     ) public returns (uint256) {
         require(
-            comp.getPriorVotes(msg.sender, sub256(getBlockNumber(), 1)) > proposalThreshold(),
+            comp.getPriorVotes(msg.sender, _sub256(_getBlockNumber(), 1)) > proposalThreshold(),
             "GovernorAlpha::propose: proposer votes below proposal threshold"
         );
         require(
@@ -179,8 +179,8 @@ contract GovernorAlpha {
             );
         }
 
-        uint256 startBlock = add256(getBlockNumber(), votingDelay());
-        uint256 endBlock = add256(startBlock, votingPeriod());
+        uint256 startBlock = _add256(_getBlockNumber(), votingDelay());
+        uint256 endBlock = _add256(startBlock, votingPeriod());
 
         proposalCount++;
         uint256 proposalId = proposalCount;
@@ -218,7 +218,7 @@ contract GovernorAlpha {
             "GovernorAlpha::queue: proposal can only be queued if it is succeeded"
         );
         Proposal storage proposal = proposals[proposalId];
-        uint256 eta = add256(getBlockTimestamp(), timelock.delay());
+        uint256 eta = _add256(_getBlockTimestamp(), timelock.delay());
         for (uint256 i = 0; i < proposal.targets.length; i++) {
             _queueOrRevert(
                 proposal.targets[i],
@@ -276,7 +276,7 @@ contract GovernorAlpha {
         Proposal storage proposal = proposals[proposalId];
         require(
             msg.sender == guardian ||
-                comp.getPriorVotes(proposal.proposer, sub256(getBlockNumber(), 1)) <
+                comp.getPriorVotes(proposal.proposer, _sub256(_getBlockNumber(), 1)) <
                 proposalThreshold(),
             "GovernorAlpha::cancel: proposer above threshold"
         );
@@ -321,9 +321,9 @@ contract GovernorAlpha {
         Proposal storage proposal = proposals[proposalId];
         if (proposal.canceled) {
             return ProposalState.Canceled;
-        } else if (getBlockNumber() <= proposal.startBlock) {
+        } else if (_getBlockNumber() <= proposal.startBlock) {
             return ProposalState.Pending;
-        } else if (getBlockNumber() <= proposal.endBlock) {
+        } else if (_getBlockNumber() <= proposal.endBlock) {
             return ProposalState.Active;
         } else if (
             proposal.forVotes <= proposal.againstVotes || proposal.forVotes < proposal.quorumVotes
@@ -333,7 +333,7 @@ contract GovernorAlpha {
             return ProposalState.Succeeded;
         } else if (proposal.executed) {
             return ProposalState.Executed;
-        } else if (getBlockTimestamp() >= add256(proposal.eta, timelock.GRACE_PERIOD())) {
+        } else if (_getBlockTimestamp() >= _add256(proposal.eta, timelock.GRACE_PERIOD())) {
             return ProposalState.Expired;
         } else {
             return ProposalState.Queued;
@@ -353,7 +353,7 @@ contract GovernorAlpha {
     ) public {
         bytes32 domainSeparator =
             keccak256(
-                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this))
+                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this))
             );
         bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
@@ -377,9 +377,9 @@ contract GovernorAlpha {
         uint96 votes = comp.getPriorVotes(voter, proposal.startBlock);
 
         if (support) {
-            proposal.forVotes = add256(proposal.forVotes, votes);
+            proposal.forVotes = _add256(proposal.forVotes, votes);
         } else {
-            proposal.againstVotes = add256(proposal.againstVotes, votes);
+            proposal.againstVotes = _add256(proposal.againstVotes, votes);
         }
 
         receipt.hasVoted = true;
@@ -430,18 +430,22 @@ contract GovernorAlpha {
         );
     }
 
-    function add256(uint256 a, uint256 b) internal pure returns (uint256) {
+    function _getMCBToken() internal view virtual returns (IERC20Upgradeable) {
+        return IERC20Upgradeable(MCB_TOKEN_ADDRESS);
+    }
+
+    function _add256(uint256 a, uint256 b) internal pure returns (uint256) {
         uint256 c = a + b;
         require(c >= a, "addition overflow");
         return c;
     }
 
-    function sub256(uint256 a, uint256 b) internal pure returns (uint256) {
+    function _sub256(uint256 a, uint256 b) internal pure returns (uint256) {
         require(b <= a, "subtraction underflow");
         return a - b;
     }
 
-    function getChainId() internal pure returns (uint256) {
+    function _getChainId() internal pure returns (uint256) {
         uint256 chainId;
         assembly {
             chainId := chainid()
@@ -449,11 +453,11 @@ contract GovernorAlpha {
         return chainId;
     }
 
-    function getBlockNumber() internal view virtual returns (uint256) {
+    function _getBlockNumber() internal view virtual returns (uint256) {
         return block.number;
     }
 
-    function getBlockTimestamp() internal view virtual returns (uint256) {
+    function _getBlockTimestamp() internal view virtual returns (uint256) {
         return block.timestamp;
     }
 }

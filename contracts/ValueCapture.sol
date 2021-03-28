@@ -10,13 +10,13 @@ import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
 import "./libraries/TokenConversion.sol";
-import "./Guardianship.sol";
+import "./interfaces/IAuthenticator.sol";
 
 interface IDecimals {
     function decimals() external view returns (uint8);
 }
 
-contract ValueCapture is Initializable, Guardianship {
+contract ValueCapture is Initializable {
     using SafeMathUpgradeable for uint256;
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -24,6 +24,9 @@ contract ValueCapture is Initializable, Guardianship {
     using TokenConversion for TokenEntry;
 
     uint256 public constant SYSTEM_DECIMALS = 18;
+    bytes32 public constant VALUE_CAPTURE_ADMIN_ROLE = keccak256("VALUE_CAPTURE_ADMIN_ROLE");
+
+    IAuthenticator public authenticator;
 
     address public vault;
     uint256 public totalCapturedUSD;
@@ -42,37 +45,54 @@ contract ValueCapture is Initializable, Guardianship {
         uint256 balanceOut
     );
     event ForwardAsset(address indexed tokenOut, uint256 amountOut, uint256 normalizeAmountOut);
+    event ForwardETH(uint256 amount);
     event ForwardERC20Token(address indexed tokenOut, uint256 amount);
     event ForwardERC721Token(address indexed tokenOut, uint256 tokenID);
-    event ForwardNativeValue(uint256 amount);
 
     receive() external payable {}
+
+    modifier onlyAuthorized() {
+        require(
+            authenticator.hasRoleOrAdmin(VALUE_CAPTURE_ADMIN_ROLE, msg.sender),
+            "caller is not authorized"
+        );
+        _;
+    }
 
     /**
      * @notice  Initialzie value capture contract.
      *
-     * @param   vault_  The address of vault contract. All funds later will be collected to this address.
-     * @param   owner_  The address of owner. Owner has privilege to set guardian of value capture which is able to call
-     *                  collect functions.
+     * @param   authenticator_  The address of authenticator controller that can determine who is able to call
+     *                          admin interfaces.
+     * @param   vault_          The address of vault contract. All funds later will be collected to this address.
      */
-    function initialize(address vault_, address owner_) external initializer {
-        __Context_init_unchained();
+    function initialize(address authenticator_, address vault_) external initializer {
+        require(vault_ != address(0), "vault is the zero address");
+        require(authenticator_.isContract(), "authenticator must be a contract");
 
+        authenticator = IAuthenticator(authenticator_);
         vault = vault_;
-        transferOwnership(owner_);
-        transferGuardianship(owner_);
     }
 
     /**
      * @notice  Return all addresses of USD tokens in whitelist as an array.
      */
-    function getUSDTokens() public view returns (address[] memory) {
-        uint256 tokenCount = _usdTokenList.length();
-        address[] memory results = new address[](tokenCount);
-        for (uint256 i = 0; i < tokenCount; i++) {
-            results[i] = _usdTokenList.at(i);
+    function listUSDTokens(uint256 begin, uint256 end)
+        public
+        view
+        returns (address[] memory result)
+    {
+        require(end > begin, "begin should be lower than end");
+        uint256 length = _usdTokenList.length();
+        if (begin >= length) {
+            return result;
         }
-        return results;
+        uint256 safeEnd = (end <= length) ? end : length;
+        result = new address[](safeEnd - begin);
+        for (uint256 i = begin; i < safeEnd; i++) {
+            result[i - begin] = _usdTokenList.at(i);
+        }
+        return result;
     }
 
     /**
@@ -83,7 +103,7 @@ contract ValueCapture is Initializable, Guardianship {
      * @param   token       The address of usd token to be put into whitelist.
      * @param   decimals    The decimals of token.
      */
-    function addUSDToken(address token, uint256 decimals) public onlyOwner {
+    function addUSDToken(address token, uint256 decimals) public onlyAuthorized {
         require(!_usdTokenList.contains(token), "token already in usd list");
         require(token.isContract(), "token address must be contract");
         require(decimals >= 0 && decimals <= 18, "decimals out of range");
@@ -106,7 +126,7 @@ contract ValueCapture is Initializable, Guardianship {
      *
      * @param   token   The address of USD token to remove.
      */
-    function removeUSDToken(address token) public onlyOwner {
+    function removeUSDToken(address token) public onlyAuthorized {
         require(_usdTokenList.contains(token), "token not in usd list");
 
         bool isRemoved = _usdTokenList.remove(token);
@@ -132,30 +152,26 @@ contract ValueCapture is Initializable, Guardianship {
         address oracle,
         address convertor_,
         uint256 slippageTolerance
-    ) public onlyOwner {
+    ) public onlyAuthorized {
         require(slippageTolerance <= 1e18, "slippage tolerance is out of range");
-        require(convertor_.isContract(), "convertor must be contract");
-
-        IUSDConvertor convertor = IUSDConvertor(convertor_);
-        require(_usdTokenList.contains(convertor.tokenOut()), "token out is not in usd list");
-        // set or update, leave cum amount unchanged
-        assetEntries[token] = TokenEntry({
-            oracle: ITWAPOracle(oracle),
-            convertor: convertor,
-            slippageTolerance: slippageTolerance,
-            cumulativeConvertedAmount: assetEntries[token].cumulativeConvertedAmount
-        });
+        require(oracle.isContract(), "oracle must be a contract");
+        require(convertor_.isContract(), "convertor must be a contract");
+        require(
+            _usdTokenList.contains(IUSDConvertor(convertor_).tokenOut()),
+            "token out is not in usd list"
+        );
+        assetEntries[token].update(oracle, convertor_, slippageTolerance);
 
         emit SetConvertor(token, convertor_);
     }
 
-    function forwardAsset(address token) public onlyGuardian {
+    function forwardAsset(address token) public onlyAuthorized {
         require(vault != address(0), "vault is not set");
 
         (address tokenOut, uint256 amountOut) = _convertTokenToUSD(token);
         require(_usdTokenList.contains(tokenOut), "unexpected out token");
 
-        uint256 normalizer = _normalizer[token];
+        uint256 normalizer = _normalizer[tokenOut];
         require(normalizer != 0, "unexpected normalizer");
         uint256 normalizeAmountOut = amountOut.mul(normalizer);
         totalCapturedUSD = totalCapturedUSD.add(normalizeAmountOut);
@@ -165,13 +181,24 @@ contract ValueCapture is Initializable, Guardianship {
     }
 
     /**
+     * @notice  This method has the same usage as `forwardERC20Token`.
+     *
+     *          **Asset sent though this method to vault will not affect mintable amount of MCB.**
+     */
+    function forwardETH(uint256 amount) public onlyAuthorized {
+        require(vault != address(0), "vault is not set");
+        AddressUpgradeable.sendValue(payable(vault), amount);
+        emit ForwardETH(amount);
+    }
+
+    /**
      * @notice  This method is should not be called if there are any convertor available for given ERC20 token.
      *          But if there is really not, or the convertor is lack of enough liquidity,
      *          guardian will be able to send the asset to vault for other usage.
      *
      *          **Asset sent though this method to vault will not affect mintable amount of MCB.**
      */
-    function forwardERC20Token(address token, uint256 amount) public onlyGuardian {
+    function forwardERC20Token(address token, uint256 amount) public onlyAuthorized {
         require(vault != address(0), "vault is not set");
         IERC20Upgradeable(token).safeTransfer(vault, amount);
         emit ForwardERC20Token(token, amount);
@@ -182,21 +209,10 @@ contract ValueCapture is Initializable, Guardianship {
      *
      *          **Asset sent though this method to vault will not affect mintable amount of MCB.**
      */
-    function forwardERC721Token(address token, uint256 tokenID) public onlyGuardian {
+    function forwardERC721Token(address token, uint256 tokenID) public onlyAuthorized {
         require(vault != address(0), "vault is not set");
         IERC721Upgradeable(token).safeTransferFrom(address(this), vault, tokenID);
         emit ForwardERC721Token(token, tokenID);
-    }
-
-    /**
-     * @notice  This method has the same usage as `forwardERC20Token`.
-     *
-     *          **Asset sent though this method to vault will not affect mintable amount of MCB.**
-     */
-    function forwardNativeCurrency(uint256 amount) public onlyGuardian {
-        require(vault != address(0), "vault is not set");
-        AddressUpgradeable.sendValue(payable(vault), amount);
-        emit ForwardNativeValue(amount);
     }
 
     function _convertTokenToUSD(address tokenIn)
@@ -213,10 +229,10 @@ contract ValueCapture is Initializable, Guardianship {
             tokenOut = tokenIn;
             amountOut = amountIn;
         } else {
-            IUSDConvertor convertor = assetEntries[tokenIn].convertor;
-            require(address(convertor) != address(0), "token has no convertor");
+            require(assetEntries[tokenIn].isAvailable(), "token has no convertor");
             // not necessary, but double check to prevent unexpected nested call.
-            amountOut = convertor.convert(amountIn);
+            tokenOut = assetEntries[tokenIn].tokenOut();
+            amountOut = assetEntries[tokenIn].convert(amountIn);
         }
         require(amountOut > 0, "balance out is 0");
         emit ConvertToken(tokenIn, amountIn, tokenOut, amountOut);

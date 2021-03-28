@@ -9,14 +9,14 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 // import "./libraries/SafeOwnable.sol";
 import "./interfaces/IComponent.sol";
 
-contract BalanceBroadcaster is Initializable, OwnableUpgradeable {
+contract BalanceBroadcaster is Initializable {
     using SafeMathUpgradeable for uint256;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     EnumerableSetUpgradeable.AddressSet internal _components;
 
-    event AddComponent(address indexed component);
-    event RemoveComponent(address indexed component);
+    event AddListener(address indexed component);
+    event RemoveListener(address indexed component);
 
     function __BalanceBroadcaster_init_unchained() internal virtual initializer {}
 
@@ -42,17 +42,17 @@ contract BalanceBroadcaster is Initializable, OwnableUpgradeable {
         return result;
     }
 
-    function addComponent(address component) public onlyOwner {
+    function _addListener(address component) internal {
         require(!_components.contains(component), "component already exists");
         require(IComponent(component).baseToken() == address(this), "owner of component mismatch");
         _components.add(component);
-        emit AddComponent(component);
+        emit AddListener(component);
     }
 
-    function removeComponent(address component) public onlyOwner {
+    function _removeListener(address component) internal {
         require(_components.contains(component), "component not exists");
         _components.remove(component);
-        emit RemoveComponent(component);
+        emit RemoveListener(component);
     }
 
     function _beforeMintingToken(

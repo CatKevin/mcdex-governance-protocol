@@ -1,49 +1,63 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.7.4;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/GSN/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 
+import "./interfaces/IAuthenticator.sol";
+
 import "./Comp.sol";
 import "./BalanceBroadcaster.sol";
 
-contract XMCB is Initializable, ContextUpgradeable, OwnableUpgradeable, Comp, BalanceBroadcaster {
+contract XMCB is Initializable, ContextUpgradeable, Comp, BalanceBroadcaster {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
+    bytes32 public constant XMCB_ADMIN_ROLE = keccak256("XMCB_ADMIN_ROLE");
     uint256 private constant WONE = 1e18;
-    uint96 internal _rawTotalSupply;
 
+    IAuthenticator public authenticator;
     IERC20Upgradeable public rawToken;
     uint256 public withdrawalPenaltyRate;
+
+    uint96 internal _rawTotalSupply;
 
     event Depoist(address indexed account, uint256 amount);
     event Withdraw(address indexed account, uint256 amount, uint256 penalty);
     event SetWithdrawalPenaltyRate(uint256 previousPenaltyRate, uint256 newPenaltyRate);
 
+    modifier onlyAuthorized() {
+        require(
+            authenticator.hasRoleOrAdmin(XMCB_ADMIN_ROLE, msg.sender),
+            "caller is not authorized"
+        );
+        _;
+    }
+
     /**
      * @notice  initialize XMCB token.
-     * @param   owner_                  Owner of XMCB who is able to set withdraw penalty rate.
+     * @param   authenticator_          Owner of XMCB who is able to set withdraw penalty rate.
      * @param   rawToken_               The token used as collateral for XMCB.
      * @param   withdrawalPenaltyRate_  The penalty rate when user withdaw.
      *                                  The deducted part will be added to all remining holders.
      */
     function initialize(
-        address owner_,
+        address authenticator_,
         address rawToken_,
         uint256 withdrawalPenaltyRate_
     ) external initializer {
+        require(authenticator_ != address(0), "authenticator is the zero address");
+
         __Context_init_unchained();
-        __Ownable_init_unchained();
         __Comp_init_unchained();
         __BalanceBroadcaster_init_unchained();
+
+        authenticator = IAuthenticator(authenticator_);
         rawToken = IERC20Upgradeable(rawToken_);
         withdrawalPenaltyRate = withdrawalPenaltyRate_;
-        transferOwnership(owner_);
     }
 
     /**
@@ -75,7 +89,11 @@ contract XMCB is Initializable, ContextUpgradeable, OwnableUpgradeable, Comp, Ba
      * @notice  Set withdrawal penalty rate. Only available to owner of XMCB.
      * @param   withdrawalPenaltyRate_  A fixed-point decimal, when 1e18 == 100% and 1e16 == 1%.
      */
-    function setWithdrawalPenaltyRate(uint256 withdrawalPenaltyRate_) public virtual onlyOwner {
+    function setWithdrawalPenaltyRate(uint256 withdrawalPenaltyRate_)
+        public
+        virtual
+        onlyAuthorized
+    {
         require(withdrawalPenaltyRate_ <= WONE, "new withdrawalPenaltyRate exceed 100%");
         emit SetWithdrawalPenaltyRate(withdrawalPenaltyRate, withdrawalPenaltyRate_);
         withdrawalPenaltyRate = withdrawalPenaltyRate_;
@@ -101,6 +119,14 @@ contract XMCB is Initializable, ContextUpgradeable, OwnableUpgradeable, Comp, Ba
         require(amount <= balanceOf(_msgSender()), "exceeded withdrawable balance");
         _beforeBurningToken(_msgSender(), amount, _totalSupply);
         _withdraw(_msgSender(), amount);
+    }
+
+    function addComponent(address component) public virtual onlyAuthorized {
+        _addListener(component);
+    }
+
+    function removeComponent(address component) public virtual onlyAuthorized {
+        _removeListener(component);
     }
 
     function _deposit(address account, uint256 amount) internal virtual {
