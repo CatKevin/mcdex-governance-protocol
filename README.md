@@ -6,7 +6,7 @@
 
 ## Overview
 
-![image-20210329215643533](./miscs/overview.png)
+![image-20210329215643533](./misc/overview.png)
 
 
 
