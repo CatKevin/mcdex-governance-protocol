@@ -165,12 +165,20 @@ contract ValueCapture is Initializable {
         emit SetConvertor(token, convertor_);
     }
 
-    function forwardAsset(address token) public onlyAuthorized {
+    /**
+     * @notice  Exchange the all the given token stored in contract for USD token, then forward the USD token to vault.
+     *
+     * @param   token   The address of token to forward to vault.
+     */
+    function forwardAsset(address token, uint256 amountIn) public {
         require(vault != address(0), "vault is not set");
+        require(amountIn != 0, "amount in is zero");
 
-        (address tokenOut, uint256 amountOut) = _convertTokenToUSD(token);
+        // prepare token to be transfer to vault
+        (address tokenOut, uint256 amountOut) = _convertTokenToUSD(token, amountIn);
         require(_usdTokenList.contains(tokenOut), "unexpected out token");
 
+        // transfer token to vault && add up the conveted amount
         uint256 normalizer = _normalizer[tokenOut];
         require(normalizer != 0, "unexpected normalizer");
         uint256 normalizeAmountOut = amountOut.mul(normalizer);
@@ -215,17 +223,17 @@ contract ValueCapture is Initializable {
         emit ForwardERC721Token(token, tokenID);
     }
 
-    function _convertTokenToUSD(address tokenIn)
+    function _convertTokenToUSD(address tokenIn, uint256 amountIn)
         internal
         returns (address tokenOut, uint256 amountOut)
     {
-        uint256 amountIn = IERC20Upgradeable(tokenIn).balanceOf(address(this));
+        uint256 convertableAmount = IERC20Upgradeable(tokenIn).balanceOf(address(this));
+        require(amountIn <= convertableAmount, "amount in execceds convertable amount");
         if (amountIn == 0) {
             // early revert
             revert("no balance to convert");
         } else if (_usdTokenList.contains(tokenIn)) {
-            // if the token to be converted is USD token in whitelist
-            // directly return the input amount
+            // if the token to be converted is USD token in whitelist, return the balance
             tokenOut = tokenIn;
             amountOut = amountIn;
         } else {

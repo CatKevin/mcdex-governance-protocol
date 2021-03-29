@@ -16,7 +16,7 @@ interface IUSDConvertor {
 
     function tokenOut() external view returns (address);
 
-    function convert(uint256 amountIn)
+    function exchange(uint256 amountIn)
         external
         returns (uint256 normalizedPrice, uint256 amountOut);
 }
@@ -28,6 +28,9 @@ struct TokenEntry {
     uint256 cumulativeConvertedAmount;
 }
 
+/**
+ * @dev TokenConversion is a wrapper to a external token exchange / swap.
+ */
 library TokenConversion {
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
@@ -63,7 +66,7 @@ library TokenConversion {
         IERC20Upgradeable tokenIn = IERC20Upgradeable(convertor.tokenIn());
 
         tokenIn.approve(entry.convertor, amountIn);
-        (uint256 dealPrice, uint256 amountOut) = convertor.convert(amountIn);
+        (uint256 dealPrice, uint256 amountOut) = convertor.exchange(amountIn);
         uint256 referencePrice = ITWAPOracle(entry.oracle).priceTWAP(); // 1e18
         require(referencePrice != 0, "reference price from oracle is zero");
         if (dealPrice < referencePrice) {

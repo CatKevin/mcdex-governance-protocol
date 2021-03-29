@@ -76,7 +76,7 @@ describe('ValueCapture', () => {
         await mcb.mint(user1.address, toWei("100"));
         await mcb.connect(user1).approve(seller.address, toWei("100"));
 
-        await seller.connect(user1).convert(toWei("100"));
+        await seller.connect(user1).exchange(toWei("100"));
         expect(await mcb.balanceOf(user1.address)).to.equal(0)
         expect(await usd.balanceOf(user1.address)).to.equal(toWei("500"))
     })
@@ -103,7 +103,7 @@ describe('ValueCapture', () => {
         expect(await usd.balanceOf(valueCapture.address)).to.equal(toWei("0"));
         expect(await usd.balanceOf(vault.address)).to.equal(toWei("0"));
 
-        await valueCapture.forwardAsset(mcb.address);
+        await valueCapture.forwardAsset(mcb.address, toWei("100"));
 
         expect(await mcb.balanceOf(valueCapture.address)).to.equal(toWei("0"));
         expect(await usd.balanceOf(valueCapture.address)).to.equal(toWei("0"));
@@ -133,7 +133,7 @@ describe('ValueCapture', () => {
         expect(await usd.balanceOf(valueCapture.address)).to.equal(toWei("0"));
         expect(await usd.balanceOf(vault.address)).to.equal(toWei("0"));
 
-        await valueCapture.forwardAsset(mcb.address);
+        await valueCapture.forwardAsset(mcb.address, toWei("100"));
 
         expect(await mcb.balanceOf(valueCapture.address)).to.equal(toWei("0"));
         expect(await usd.balanceOf(valueCapture.address)).to.equal(toWei("0"));
@@ -165,7 +165,7 @@ describe('ValueCapture', () => {
         expect(await usd.balanceOf(valueCapture.address)).to.equal(toWei("0"));
         expect(await usd.balanceOf(vault.address)).to.equal(toWei("0"));
 
-        await valueCapture.forwardAsset(mcb.address);
+        await valueCapture.forwardAsset(mcb.address, toWei("100"));
 
         expect(await mcb.balanceOf(valueCapture.address)).to.equal(toWei("0"));
         expect(await usd.balanceOf(valueCapture.address)).to.equal(toWei("0"));
@@ -221,14 +221,12 @@ describe('ValueCapture', () => {
 
         // no converter
         await mcb.mint(valueCapture.address, toWei("100"))
-        await expect(valueCapture.forwardAsset(mcb.address)).to.be.revertedWith("token has no convertor")
+        await expect(valueCapture.forwardAsset(mcb.address, toWei("0"))).to.be.revertedWith("amount in is zero")
 
         // usd
         await usd.mint(valueCapture.address, toWei("100"))
-        await valueCapture.forwardAsset(usd.address);
+        await valueCapture.forwardAsset(usd.address, toWei("100"));
         expect(await valueCapture.totalCapturedUSD()).to.equal(toWei("100"))
-
-        await expect(valueCapture.forwardAsset(usd.address)).to.be.revertedWith("no balance to convert")
 
         // 1e18 mcb = 5e6 usd
         const seller = await createContract("ConstantSeller", [mcb.address, usd.address, toWei("4.94")])
@@ -237,10 +235,10 @@ describe('ValueCapture', () => {
         await valueCapture.setConvertor(mcb.address, oracle.address, seller.address, toWei("0.01")); // 1%
 
         await oracle.setPrice(toWei("5"));
-        await expect(valueCapture.forwardAsset(mcb.address)).to.be.revertedWith("slippage exceeds tolerance")
+        await expect(valueCapture.forwardAsset(mcb.address, toWei("100"))).to.be.revertedWith("slippage exceeds tolerance")
 
         await oracle.setPrice(toWei("4.98"));
-        valueCapture.forwardAsset(mcb.address);
+        await valueCapture.forwardAsset(mcb.address, toWei("100"));
     })
 
 

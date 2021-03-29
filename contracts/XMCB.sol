@@ -121,10 +121,20 @@ contract XMCB is Initializable, ContextUpgradeable, Comp, BalanceBroadcaster {
         _withdraw(_msgSender(), amount);
     }
 
+    /**
+     * @notice  Add a component to list. A component means a external contract which is able to receive deposit / withdraw
+     *          notification from XMCB.
+     * @param   component   The address of component to add.
+     */
     function addComponent(address component) public virtual onlyAuthorized {
         _addListener(component);
     }
 
+    /**
+     * @notice  Remove a component from list. A component means a external contract which is able to receive deposit / withdraw
+     *          notification from XMCB.
+     * @param   component   The address of component to add.
+     */
     function removeComponent(address component) public virtual onlyAuthorized {
         _removeListener(component);
     }

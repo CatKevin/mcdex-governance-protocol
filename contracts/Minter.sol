@@ -18,7 +18,7 @@ interface IMCB is IERC20Upgradeable {
 }
 
 interface L2Caller {
-    function l2Sender() public view returns (address);
+    function l2Sender() external view returns (address);
 }
 
 contract Minter {
@@ -136,7 +136,7 @@ contract Minter {
         require(l2Caller.l2Sender() == address(0x0000000000000000000000000000000000000000), "");
         uint256 newIndex = releaseReceipts.length;
         releaseReceipts[newIndex] = ReleaseReceipt({
-            releaseType: ReleaseToL1,
+            releaseType: ReleaseType.ReleaseToL1,
             executed: false,
             recipient: address(0x0000000000000000000000000000000000000000),
             amount: 0

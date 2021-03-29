@@ -54,31 +54,59 @@ contract Vault is Initializable, ERC721HolderUpgradeable, ReentrancyGuardUpgrade
         authenticator = IAuthenticator(authenticator_);
     }
 
-    function transferETH(address to, uint256 value) external onlyAuthorized nonReentrant {
+    /**
+     * @notice  A helper method to transfer Ether to somewhere.
+     *
+     * @param   recipient   The receiver of the sent asset.
+     * @param   value       The amount of asset to send.
+     */
+    function transferETH(address recipient, uint256 value) external onlyAuthorized nonReentrant {
         require(value != 0, "transfer value is zero");
-        AddressUpgradeable.sendValue(payable(to), value);
-        emit TransferETH(to, value);
+        AddressUpgradeable.sendValue(payable(recipient), value);
+        emit TransferETH(recipient, value);
     }
 
+    /**
+     * @notice  A helper method to transfer ERC20 to somewhere.
+     *
+     * @param   token       The address of to be sent ERC20 token.
+     * @param   recipient   The receiver of the sent asset.
+     * @param   amount      The amount of asset to send.
+     */
     function transferERC20(
         address token,
-        address to,
+        address recipient,
         uint256 amount
     ) external onlyAuthorized nonReentrant {
         require(amount != 0, "transfer amount is zero");
-        IERC20Upgradeable(token).safeTransfer(to, amount);
-        emit TransferERC20Token(token, to, amount);
+        IERC20Upgradeable(token).safeTransfer(recipient, amount);
+        emit TransferERC20Token(token, recipient, amount);
     }
 
+    /**
+     * @notice  A helper method to transfer ERC721 to somewhere.
+     *
+     * @param   token       The address of to be sent ERC721 token.
+     * @param   tokenID     The ID of token.
+     * @param   recipient   The receiver of the sent asset.
+     */
     function transferERC721(
         address token,
         uint256 tokenID,
-        address to
+        address recipient
     ) external onlyAuthorized nonReentrant {
-        IERC721Upgradeable(token).safeTransferFrom(address(this), to, tokenID);
-        emit TransferERC721Token(token, tokenID, to);
+        IERC721Upgradeable(token).safeTransferFrom(address(this), recipient, tokenID);
+        emit TransferERC721Token(token, tokenID, recipient);
     }
 
+    /**
+     * @notice  Execute a transaction from vault.
+     *          Usually, calling this method is to handle some special asset which cannot be achieved by transferXXX methods.
+     *
+     * @param   to      The target address which the transaction is to send to.
+     * @param   data    A bytes array contains calldata.
+     * @param   value   The value of ethers to be sent with the transation.
+     */
     function execute(
         address to,
         bytes calldata data,

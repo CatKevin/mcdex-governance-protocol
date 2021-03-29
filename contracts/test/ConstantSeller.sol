@@ -47,7 +47,7 @@ contract ConstantSeller {
         price = price_;
     }
 
-    function convert(uint256 amount) public returns (uint256, uint256) {
+    function exchange(uint256 amount) public returns (uint256, uint256) {
         require(price != 0, "no price");
         require(amount > 0, "0 amount");
 
