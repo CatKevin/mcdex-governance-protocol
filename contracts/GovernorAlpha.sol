@@ -3,8 +3,11 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
+import "./interfaces/IDataExchange.sol";
+
 contract GovernorAlpha {
-    address public constant MCB_TOKEN_ADDRESS = 0x0000000000000000000000000000000000000000;
+    address public constant DATA_EXCHANGE_ADDRESS = 0x0000000000000000000000000000000000000000;
+    bytes32 public constant MCB_TOTAL_SUPPLY = keccak256("MCB_TOTAL_SUPPLY");
 
     /// @notice The name of this contract
     string public constant name = "MCDEX DAO Governor Alpha";
@@ -13,12 +16,12 @@ contract GovernorAlpha {
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
     function quorumVotes() public view returns (uint256) {
-        return _getMCBToken().totalSupply() / 10;
+        return _getMCBTotalSupply() / 10;
     } // 10% of mcb (current totalSupply)
 
     /// @notice The number of votes required in order for a voter to become a proposer
     function proposalThreshold() public view returns (uint256) {
-        return _getMCBToken().totalSupply() / 100;
+        return _getMCBTotalSupply() / 100;
     } // 100,000 = 1% of mcb (current totalSupply)
 
     /// @notice The maximum number of actions that can be included in a proposal
@@ -430,10 +433,6 @@ contract GovernorAlpha {
         );
     }
 
-    function _getMCBToken() internal view virtual returns (IERC20Upgradeable) {
-        return IERC20Upgradeable(MCB_TOKEN_ADDRESS);
-    }
-
     function _add256(uint256 a, uint256 b) internal pure returns (uint256) {
         uint256 c = a + b;
         require(c >= a, "addition overflow");
@@ -459,6 +458,11 @@ contract GovernorAlpha {
 
     function _getBlockTimestamp() internal view virtual returns (uint256) {
         return block.timestamp;
+    }
+
+    function _getMCBTotalSupply() internal view virtual returns (uint256) {
+        (bytes memory data, ) = IDataExchange(DATA_EXCHANGE_ADDRESS).getData(MCB_TOTAL_SUPPLY);
+        return abi.decode(data, (uint256));
     }
 }
 

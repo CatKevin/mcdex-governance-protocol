@@ -3,16 +3,17 @@ pragma solidity 0.7.4;
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "./interfaces/IAuthenticator.sol";
 
 /**
- * @notice  Vault is a contract to hold various assets from different source.
+ * @notice  ExecutionProxy is a proxy that can forward transaction with authentication.
  */
-contract OperatorProxy is Initializable {
+contract ExecutionProxy is Initializable, ReentrancyGuardUpgradeable {
     using AddressUpgradeable for address;
 
-    bytes32 public constant OPERATOR_ADMIN_ROLE = keccak256("OPERATOR_ADMIN_ROLE");
+    bytes32 public OPERATOR_ADMIN_ROLE;
 
     IAuthenticator public authenticator;
 
@@ -34,16 +35,20 @@ contract OperatorProxy is Initializable {
      * @param   authenticator_  The address of authentication controller that can determine who is able to call
      *                          admin interfaces.
      */
-    function initialize(address authenticator_) external initializer {
+    function initialize(address authenticator_, bytes32 adminRole) external initializer {
         require(authenticator_ != address(0), "authenticator is the zero address");
         authenticator = IAuthenticator(authenticator_);
+        OPERATOR_ADMIN_ROLE = adminRole;
     }
 
+    /**
+     * @notice  Execute a customized transaction.
+     */
     function execute(
         address to,
         bytes calldata data,
         uint256 value
-    ) external onlyAuthorized {
+    ) external onlyAuthorized nonReentrant {
         AddressUpgradeable.functionCallWithValue(to, data, value);
         emit ExecuteTransaction(to, data, value);
     }

@@ -27,7 +27,7 @@ contract RewardDistribution is Context, Ownable {
     bytes32 public constant REWARD_DISTRIBUTION_ADMIN_ROLE =
         keccak256("REWARD_DISTRIBUTION_ADMIN_ROLE");
 
-    IXMCB public xMCB;
+    IXMCB public xmcb;
     IAuthenticator public authenticator;
 
     struct RewardPlan {
@@ -65,13 +65,13 @@ contract RewardDistribution is Context, Ownable {
         _;
     }
 
-    constructor(address authenticator_, address xMCB_) Ownable() {
+    constructor(address authenticator_, address XMCB_) Ownable() {
         authenticator = IAuthenticator(authenticator_);
-        xMCB = IXMCB(xMCB_);
+        xmcb = IXMCB(XMCB_);
     }
 
     function baseToken() public view returns (address) {
-        return address(xMCB);
+        return address(xmcb);
     }
 
     function beforeMintingToken(
@@ -196,7 +196,7 @@ contract RewardDistribution is Context, Ownable {
      */
     function rewardPerToken(address token) public view returns (uint256) {
         RewardPlan storage plan = _rewardPlans[token];
-        uint256 totalSupply = xMCB.rawTotalSupply();
+        uint256 totalSupply = xmcb.rawTotalSupply();
         if (totalSupply == 0) {
             return plan.rewardPerTokenStored;
         }
@@ -215,7 +215,7 @@ contract RewardDistribution is Context, Ownable {
      */
     function earned(address token, address account) public view returns (uint256) {
         RewardPlan storage plan = _rewardPlans[token];
-        uint256 balance = xMCB.rawBalanceOf(account);
+        uint256 balance = xmcb.rawBalanceOf(account);
         return
             balance
                 .mul(rewardPerToken(token).sub(plan.userRewardPerTokenPaid[account]))

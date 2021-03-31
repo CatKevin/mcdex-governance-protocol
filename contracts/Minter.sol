@@ -7,7 +7,8 @@ import "@openzeppelin/contracts-upgradeable/math/MathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
-import "hardhat/console.sol";
+import "./interfaces/IL2ArbNetwork.sol";
+import "./interfaces/IDataExchange.sol";
 
 interface IValueCapture {
     function totalCapturedUSD() external view returns (uint256);
@@ -17,18 +18,18 @@ interface IMCB is IERC20Upgradeable {
     function mint(address account, uint256 amount) external;
 }
 
-interface L2Caller {
-    function l2Sender() external view returns (address);
-}
-
 contract Minter {
     using AddressUpgradeable for address;
     using MathUpgradeable for uint256;
     using SafeMathUpgradeable for uint256;
 
-    enum ReleaseType { NoneType, ReleaseToL1, ReleaseToArbL2 }
+    address public constant MINT_INITIATOR_ADDRESS = 0xC0250Ed5Da98696386F13bE7DE31c1B54a854098;
+    address public constant ROLLUP_ADDRESS = 0xC0250Ed5Da98696386F13bE7DE31c1B54a854098;
+    bytes32 public constant TOTAL_CAPTURED_USD_KEY = keccak256("TOTAL_CAPTURED_USD_KEY");
 
-    struct ReleaseReceipt {
+    enum ReleaseType { None, ToL1, ToL2 }
+
+    struct MintRequest {
         ReleaseType releaseType;
         bool executed;
         address recipient;
@@ -53,9 +54,11 @@ contract Minter {
     uint256 public seriesALastUpdateBlock;
 
     IMCB public mcbToken;
-    IValueCapture public valueCapture;
-    ReleaseReceipt[] public releaseReceipts;
+    IDataExchange public dataExchange;
+    MintRequest[] public mintRequests;
 
+    event MintToL1(address indexed recipient, uint256 amount);
+    event MintToL2(address indexed recipient, uint256 amount);
     event MintMCB(
         address indexed recipient,
         uint256 recipientReceivedAmount,
@@ -63,11 +66,22 @@ contract Minter {
         uint256 devReceivedAmount
     );
     event SetDevAccount(address indexed devOld, address indexed devNew);
-    event RequestFromL2();
+    event ReceiveMintRequest(
+        uint256 index,
+        ReleaseType releaseType,
+        address indexed recipient,
+        uint256 amount
+    );
+    event ExecuteMintRequest(
+        uint256 index,
+        ReleaseType releaseType,
+        address indexed recipient,
+        uint256 amount
+    );
 
     constructor(
         address mcbToken_,
-        address valueCapture_,
+        address dataExchange_,
         address seriesA_,
         address devAccount_,
         uint256 baseMaxSupply_,
@@ -76,10 +90,8 @@ contract Minter {
         uint256 seriesAMaxReleaseRate_
     ) {
         require(mcbToken_.isContract(), "token must be contract");
-        require(valueCapture_.isContract(), "value capture must be contract");
-
         mcbToken = IMCB(mcbToken_);
-        valueCapture = IValueCapture(valueCapture_);
+        dataExchange = IDataExchange(dataExchange_);
         seriesA = seriesA_;
         devAccount = devAccount_;
         require(
@@ -92,18 +104,30 @@ contract Minter {
         seriesAMaxReleaseRate = seriesAMaxReleaseRate_;
     }
 
+    /**
+     * @notice The start block to release MCB.
+     */
     function genesisBlock() public pure virtual returns (uint256) {
         return 0;
     }
 
+    /**
+     * @notice The max MCB supply including the released part and the part to be released.
+     */
     function mcbTotalSupply() public pure virtual returns (uint256) {
         return 10000000 * 1e18; // 10,000,000
     }
 
+    /**
+     * @notice The dev team will share 25% of the amount to be minted.
+     */
     function devCommissionRate() public pure virtual returns (uint256) {
         return 25 * 1e16; // 25%
     }
 
+    /**
+     * @notice  Set the dev account who is the beneficiary of shares from minted MCB token.
+     */
     function setDevAccount(address devAccount_) external {
         require(msg.sender == devAccount, "caller must be dev account");
         require(devAccount_ != devAccount, "already dev account");
@@ -111,74 +135,20 @@ contract Minter {
         devAccount = devAccount_;
     }
 
-    function getSeriesAMintableAmount() public returns (uint256) {
-        updateMintableAmount();
-        return seriesAMintableAmount.min(seriesAMaxSupply);
-    }
-
-    function getBaseMintableAmount() public returns (uint256) {
-        updateMintableAmount();
-        return _getBaseMintableAmount().min(baseMaxSupply);
-    }
-
-    function seriesAMint(uint256 amount) public {
-        updateMintableAmount();
-        require(amount <= _getBaseMintableAmount(), "amount exceeds max mintable amount");
-        _mint(seriesA, amount);
-
-        seriesAMintedAmount = seriesAMintedAmount.add(amount);
-        require(seriesAMintedAmount <= seriesAMaxSupply, "minted amount exceeds max supply");
-    }
-
-    function l2Mint() public {
-        L2Caller l2Caller = L2Caller(msg.sender);
-        require(msg.sender == address(0x0000000000000000000000000000000000000000), "");
-        require(l2Caller.l2Sender() == address(0x0000000000000000000000000000000000000000), "");
-        uint256 newIndex = releaseReceipts.length;
-        releaseReceipts[newIndex] = ReleaseReceipt({
-            releaseType: ReleaseType.ReleaseToL1,
-            executed: false,
-            recipient: address(0x0000000000000000000000000000000000000000),
-            amount: 0
-        });
-        emit RequestFromL2();
-    }
-
-    function baseMint(uint256 receiptIndex) public {
-        ReleaseReceipt storage receipt = releaseReceipts[receiptIndex];
-        require(receipt.releaseType != ReleaseType.NoneType && !receipt.executed, "");
-        _baseMint(receipt.recipient, receipt.amount);
-        receipt.executed = true;
-    }
-
-    function _baseMint(address recipient, uint256 amount) internal {
-        updateMintableAmount();
-        require(amount <= _getBaseMintableAmount(), "amount exceeds max mintable amount");
-        _mint(recipient, amount);
-        baseMintedAmount = baseMintedAmount.add(amount);
-        require(baseMintedAmount <= baseMaxSupply, "minted amount exceeds max supply");
-    }
-
-    function _mint(address recipient, uint256 amount) internal {
-        require(amount > 0, "amount is zero");
-        require(
-            mcbToken.totalSupply().add(amount) <= mcbTotalSupply(),
-            "mint amount exceeds total supply"
-        );
-
-        uint256 toDevAmount = amount.mul(devCommissionRate()).div(1e18);
-        uint256 toRecipientAmount = amount.sub(toDevAmount);
-        mcbToken.mint(recipient, toRecipientAmount);
-        mcbToken.mint(devAccount, toDevAmount);
-
-        emit MintMCB(recipient, toRecipientAmount, devAccount, toDevAmount);
-    }
-
+    /**
+     * @notice  Update mintable amount. There are two types of minting, with different destination: base and series-A.
+     *          The base mintable amount is composed of a constant releasing rate and the fee catpure from liqudity pool;
+     *          The series-A part is mainly from the captured part of base mintable amount.
+     *          This method updates both the base part and the series-A part. To see the rule, check ... for details.
+     */
     function updateMintableAmount() public {
         _updateExtraMintableAmount();
         updateSeriesAMintableAmount();
     }
 
+    /**
+     * @notice  Update the mintable amount for series-A separately.
+     */
     function updateSeriesAMintableAmount() public {
         if (_getBlockNumber() <= seriesALastUpdateBlock || extraMintableAmount == 0) {
             return;
@@ -196,21 +166,178 @@ contract Minter {
         seriesALastUpdateBlock = _getBlockNumber();
     }
 
+    /**
+     * @notice  Get the mintable amount for series-A.
+     */
+    function getSeriesAMintableAmount() public returns (uint256) {
+        updateMintableAmount();
+        return seriesAMintableAmount.min(seriesAMaxSupply);
+    }
+
+    /**
+     * @notice  Get the mintable amount for base.
+     */
+    function getBaseMintableAmount() public returns (uint256) {
+        updateMintableAmount();
+        return _getBaseMintableAmount().min(baseMaxSupply);
+    }
+
+    /**
+     * @notice  Mint MCB to series-A recipient. Can be called by any one.
+     */
+    function seriesAMint(
+        uint256 amount,
+        address bridge,
+        uint256 maxSubmissionCost,
+        uint256 maxGas,
+        uint256 gasPriceBid
+    ) public {
+        updateMintableAmount();
+        require(amount <= seriesAMintableAmount, "amount exceeds max mintable amount");
+        _mintToL2(seriesA, amount, bridge, maxSubmissionCost, maxGas, gasPriceBid);
+        seriesAMintableAmount = seriesAMintableAmount.sub(amount);
+        seriesAMintedAmount = seriesAMintedAmount.add(amount);
+        require(seriesAMintedAmount <= seriesAMaxSupply, "minted amount exceeds max supply");
+    }
+
+    /**
+     * @notice  Receive minting request sent by `MintInitiator`.
+     *          The request will be stored into an array, and later be executed.
+     */
+    function receiveMintRequestFromL2(
+        uint8 releaseType,
+        address recipient,
+        uint256 amount
+    ) public {
+        require(_getL2Sender(msg.sender) == MINT_INITIATOR_ADDRESS, "sender is not the initiator");
+        uint256 index = mintRequests.length;
+        mintRequests.push(
+            MintRequest({
+                releaseType: ReleaseType(releaseType),
+                executed: false,
+                recipient: recipient,
+                amount: amount
+            })
+        );
+        emit ReceiveMintRequest(index, ReleaseType(releaseType), recipient, amount);
+    }
+
+    /**
+     * @notice   Execute a minting request, mint token to different recipient according to the `mintType`.
+     */
+    function executeMintRequest(
+        uint256 index,
+        address bridge,
+        uint256 maxSubmissionCost,
+        uint256 maxGas,
+        uint256 gasPriceBid
+    ) public {
+        MintRequest storage request = mintRequests[index];
+        require(request.releaseType != ReleaseType.None, "request has been executed");
+        require(!request.executed, "request has been executed");
+        if (request.releaseType == ReleaseType.ToL1) {
+            _mintToL1(request.recipient, request.amount);
+        } else if (request.releaseType == ReleaseType.ToL1) {
+            _mintToL2(
+                request.recipient,
+                request.amount,
+                bridge,
+                maxSubmissionCost,
+                maxGas,
+                gasPriceBid
+            );
+        } else {
+            revert("unrecognized release type");
+        }
+        request.executed = true;
+        emit ExecuteMintRequest(index, request.releaseType, request.recipient, request.amount);
+    }
+
+    function _mintToL1(address recipient, uint256 amount) internal {
+        updateMintableAmount();
+        require(amount <= _getBaseMintableAmount(), "amount exceeds max mintable amount");
+
+        _mint(recipient, amount);
+        baseMintedAmount = baseMintedAmount.add(amount);
+        require(baseMintedAmount <= baseMaxSupply, "minted amount exceeds max supply");
+
+        emit MintToL1(recipient, amount);
+    }
+
+    function _mintToL2(
+        address recipient,
+        uint256 amount,
+        address bridge,
+        uint256 maxSubmissionCost,
+        uint256 maxGas,
+        uint256 gasPriceBid
+    ) internal {
+        IL2ERC20Bridge erc20Bridge = IL2ERC20Bridge(bridge);
+        require(_isValidInbox(erc20Bridge.inbox()), "inbox is invalid");
+        updateMintableAmount();
+        require(amount <= _getBaseMintableAmount(), "amount exceeds max mintable amount");
+        _mint(address(this), amount);
+        mcbToken.approve(bridge, amount);
+        erc20Bridge.depositAsERC20(
+            address(mcbToken),
+            recipient,
+            amount,
+            maxSubmissionCost,
+            maxGas,
+            gasPriceBid,
+            ""
+        );
+        baseMintedAmount = baseMintedAmount.add(amount);
+        require(baseMintedAmount <= baseMaxSupply, "minted amount exceeds max supply");
+
+        emit MintToL2(recipient, amount);
+    }
+
+    function _isValidInbox(address inbox) internal view returns (bool) {
+        IBridge trustedBridge = IBridge(IRollup(ROLLUP_ADDRESS).bridge());
+        return trustedBridge.allowedInboxes(inbox);
+    }
+
+    function _getL2Sender(address bridge) internal view returns (address) {
+        address trustedBridge = IRollup(ROLLUP_ADDRESS).bridge();
+        require(trustedBridge == bridge, "not a valid l2 outbox");
+        IOutbox outbox = IOutbox(IBridge(trustedBridge).activeOutbox());
+        return outbox.l2ToL1Sender();
+    }
+
+    function _mint(address recipient, uint256 amount) internal {
+        require(recipient != address(0), "recipient is the zero address");
+        require(amount > 0, "amount is zero");
+        uint256 toDevAmount = amount.mul(devCommissionRate()).div(1e18);
+        uint256 toRecipientAmount = amount.sub(toDevAmount);
+        mcbToken.mint(recipient, toRecipientAmount);
+        mcbToken.mint(devAccount, toDevAmount);
+        require(
+            mcbToken.totalSupply() < mcbTotalSupply(),
+            "minted amount exceeds max total supply"
+        );
+
+        emit MintMCB(recipient, toRecipientAmount, devAccount, toDevAmount);
+    }
+
     function _updateExtraMintableAmount() internal {
-        if (_getBlockNumber() <= _getLastValueCapturedBlock()) {
+        (uint256 capturedValue, uint256 capturedTimestamp) = _getTotalCapturedUSD();
+        if (lastValueCapturedBlock >= capturedTimestamp) {
             return;
         }
-        uint256 capturedValue = valueCapture.totalCapturedUSD();
         uint256 incrementalCapturedValue = capturedValue.sub(totalCapturedValue);
-        {
-            uint256 elapsedBlock = _getBlockNumber().sub(_getLastValueCapturedBlock());
-            uint256 baseMintableAmount = elapsedBlock.mul(baseMinReleaseRate);
-            if (incrementalCapturedValue > baseMintableAmount) {
-                extraMintableAmount = incrementalCapturedValue.sub(baseMintableAmount);
-            }
-            lastValueCapturedBlock = _getBlockNumber();
+        uint256 elapsedBlock = capturedTimestamp.sub(_getLastValueCapturedBlock());
+        uint256 baseMintableAmount = elapsedBlock.mul(baseMinReleaseRate);
+        if (incrementalCapturedValue > baseMintableAmount) {
+            extraMintableAmount = incrementalCapturedValue.sub(baseMintableAmount);
         }
+        lastValueCapturedBlock = capturedTimestamp;
         totalCapturedValue = capturedValue;
+    }
+
+    function _getTotalCapturedUSD() internal view returns (uint256, uint256) {
+        (bytes memory data, uint256 timestamp) = dataExchange.getData(TOTAL_CAPTURED_USD_KEY);
+        return (abi.decode(data, (uint256)), timestamp);
     }
 
     function _getLastValueCapturedBlock() internal view returns (uint256) {

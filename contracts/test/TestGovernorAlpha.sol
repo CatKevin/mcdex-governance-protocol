@@ -48,7 +48,7 @@ contract TestGovernorAlpha is GovernorAlpha {
         return mockBlockTimestamp == 0 ? block.timestamp : mockBlockTimestamp;
     }
 
-    function _getMCBToken() internal view virtual override returns (IERC20Upgradeable) {
-        return IERC20Upgradeable(mockMCB);
+    function _getMCBTotalSupply() internal view virtual override returns (uint256) {
+        return IERC20Upgradeable(mockMCB).totalSupply();
     }
 }

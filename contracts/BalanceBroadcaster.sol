@@ -20,14 +20,23 @@ contract BalanceBroadcaster is Initializable {
 
     function __BalanceBroadcaster_init_unchained() internal virtual initializer {}
 
+    /**
+     * @notice  Return the count of registered components.
+     */
     function componentCount() public view returns (uint256) {
         return _components.length();
     }
 
+    /**
+     * @notice  Check if a address is a registered component in broadcaster.
+     */
     function isComponent(address component) public view returns (bool) {
         return _components.contains(component);
     }
 
+    /**
+     * @notice  Get registered components within [begin, end) as an array of addresses.
+     */
     function listComponents(uint256 begin, uint256 end)
         public
         view

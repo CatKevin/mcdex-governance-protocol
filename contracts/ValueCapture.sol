@@ -11,6 +11,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
 import "./libraries/TokenConversion.sol";
 import "./interfaces/IAuthenticator.sol";
+import "./interfaces/IDataExchange.sol";
 
 interface IDecimals {
     function decimals() external view returns (uint8);
@@ -25,8 +26,10 @@ contract ValueCapture is Initializable {
 
     uint256 public constant SYSTEM_DECIMALS = 18;
     bytes32 public constant VALUE_CAPTURE_ADMIN_ROLE = keccak256("VALUE_CAPTURE_ADMIN_ROLE");
+    bytes32 public constant TOTAL_CAPTURED_USD_KEY = keccak256("TOTAL_CAPTURED_USD_KEY");
 
     IAuthenticator public authenticator;
+    IDataExchange public dataExchange;
 
     address public vault;
     uint256 public totalCapturedUSD;
@@ -139,7 +142,7 @@ contract ValueCapture is Initializable {
      * @notice  Add a 'convertor' for some token.
      *          A convertor is known as a external contract who has an interface to accept some kind of token
      *          and return USD token in value capture's whitelist.
-     *          That means the output token of convertor must be in the whitelist.
+     *          That means the output token of convertor must be in th e whitelist.
      *          See contract/interfaces/IUSDConvertor.sol for interface spec of a convertor.
      *
      * @param   token               The address of any token accepted by convertor.
@@ -184,14 +187,22 @@ contract ValueCapture is Initializable {
         uint256 normalizeAmountOut = amountOut.mul(normalizer);
         totalCapturedUSD = totalCapturedUSD.add(normalizeAmountOut);
         IERC20Upgradeable(tokenOut).safeTransfer(vault, amountOut);
+        pushCapturedValueToL1();
 
         emit ForwardAsset(tokenOut, amountOut, normalizeAmountOut);
+    }
+
+    function pushCapturedValueToL1() public {
+        dataExchange.pushDataFromL2(
+            TOTAL_CAPTURED_USD_KEY,
+            abi.encode(totalCapturedUSD, _getBlockTimestamp())
+        );
     }
 
     /**
      * @notice  This method has the same usage as `forwardERC20Token`.
      *
-     *          **Asset sent though this method to vault will not affect mintable amount of MCB.**
+     *          *Asset sent though this method to vault will not affect mintable amount of MCB.*
      */
     function forwardETH(uint256 amount) public onlyAuthorized {
         require(vault != address(0), "vault is not set");
@@ -204,7 +215,7 @@ contract ValueCapture is Initializable {
      *          But if there is really not, or the convertor is lack of enough liquidity,
      *          guardian will be able to send the asset to vault for other usage.
      *
-     *          **Asset sent though this method to vault will not affect mintable amount of MCB.**
+     *          *Asset sent though this method to vault will not affect mintable amount of MCB.*
      */
     function forwardERC20Token(address token, uint256 amount) public onlyAuthorized {
         require(vault != address(0), "vault is not set");
@@ -215,7 +226,7 @@ contract ValueCapture is Initializable {
     /**
      * @notice  This method has the same usage as `forwardERC20Token`.
      *
-     *          **Asset sent though this method to vault will not affect mintable amount of MCB.**
+     *          *Asset sent though this method to vault will not affect mintable amount of MCB.*
      */
     function forwardERC721Token(address token, uint256 tokenID) public onlyAuthorized {
         require(vault != address(0), "vault is not set");
@@ -244,5 +255,9 @@ contract ValueCapture is Initializable {
         }
         require(amountOut > 0, "balance out is 0");
         emit ConvertToken(tokenIn, amountIn, tokenOut, amountOut);
+    }
+
+    function _getBlockTimestamp() internal view virtual returns (uint256) {
+        return block.timestamp;
     }
 }

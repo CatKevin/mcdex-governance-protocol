@@ -5,21 +5,8 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
-import "hardhat/console.sol";
-
-interface ITWAPOracle {
-    function priceTWAP() external view returns (uint256);
-}
-
-interface IUSDConvertor {
-    function tokenIn() external view returns (address);
-
-    function tokenOut() external view returns (address);
-
-    function exchange(uint256 amountIn)
-        external
-        returns (uint256 normalizedPrice, uint256 amountOut);
-}
+import "../interfaces/IUSDConvertor.sol";
+import "../interfaces/ITWAPOracle.sol";
 
 struct TokenEntry {
     address oracle;
@@ -35,6 +22,12 @@ library TokenConversion {
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
 
+    /**
+     * @dev  Update a token entry, set properties.
+     * @param   oracle              The address of oracle to retrieve reference price.
+     * @param   convertor           An wrapper of external exchange / swap interface.
+     * @param   slippageTolerance   The maximum acceptable price loss relative to the reference price in a conversion transaction.
+     */
     function update(
         TokenEntry storage entry,
         address oracle,
@@ -49,23 +42,34 @@ library TokenConversion {
         entry.slippageTolerance = slippageTolerance;
     }
 
-    function isAvailable(TokenEntry storage entry) internal returns (bool) {
+    /**
+     * @dev  Test if a entry is available.
+     */
+    function isAvailable(TokenEntry storage entry) internal view returns (bool) {
         return entry.oracle != address(0) && entry.convertor != address(0);
     }
 
+    /**
+     * @dev The address of token to be converted.
+     */
     function tokenIn(TokenEntry storage entry) internal view returns (address) {
         return IUSDConvertor(entry.convertor).tokenIn();
     }
 
+    /**
+     * @dev The address of token to get.
+     */
     function tokenOut(TokenEntry storage entry) internal view returns (address) {
         return IUSDConvertor(entry.convertor).tokenOut();
     }
 
+    /**
+     * @dev Convert (including but not only sell) one token to another with an external exchange.
+     *      The price slippage will be checked to prevent unexpected conversion.
+     */
     function convert(TokenEntry storage entry, uint256 amountIn) internal returns (uint256) {
         IUSDConvertor convertor = IUSDConvertor(entry.convertor);
-        IERC20Upgradeable tokenIn = IERC20Upgradeable(convertor.tokenIn());
-
-        tokenIn.approve(entry.convertor, amountIn);
+        IERC20Upgradeable(convertor.tokenIn()).approve(entry.convertor, amountIn);
         (uint256 dealPrice, uint256 amountOut) = convertor.exchange(amountIn);
         uint256 referencePrice = ITWAPOracle(entry.oracle).priceTWAP(); // 1e18
         require(referencePrice != 0, "reference price from oracle is zero");

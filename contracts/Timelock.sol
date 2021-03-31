@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
-
 pragma solidity 0.7.4;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-
-import "hardhat/console.sol";
 
 contract Timelock {
     using SafeMath for uint256;
