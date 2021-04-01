@@ -20,7 +20,7 @@
 
 ### Minter
 
-`Minter` system is designed to take over the role of MCB minter. 
+`Minter` system is designed to take over the role of MCB minter.
 
 A generic description to the rule of MCB release is:
 
@@ -38,7 +38,7 @@ And there is also some assumptions for the minting progress:
 
 - By default, new MCB should be minted to an L2 address.
 
-Since the main components including the `ValueCapture` contract are deployed on L2 network and the `Mint` contract is deployed on L1 network, there are some helper contracts to help `Minter` contract get the correct captured value and send minted token to L2. 
+Since the main components including the `ValueCapture` contract are deployed on L2 network and the `Mint` contract is deployed on L1 network, there are some helper contracts to help `Minter` contract get the correct captured value and send minted token to L2.
 
 ![Mint To L2](../misc/minttol2.png)
 
@@ -53,7 +53,7 @@ function getSeriesAMintableAmount() public returns (uint256)
 function getBaseMintableAmount() public returns (uint256)
 ```
 
-Call these method to retrieve current mintable amount of base part and series-A part. 
+Call these method to retrieve current mintable amount of base part and series-A part.
 
 *Before read the amounts, a update operation will be performed, so the methods are not read-only. Try use staticCall to get the result.*
 
@@ -69,7 +69,7 @@ function executeMintRequest(
     uint256 maxSubmissionCost,
     uint256 maxGas,
     uint256 gasPriceBid
-) public 
+) public
 ```
 
 `receiveMintRequestFromL2` receives requests from L2 and can be executed through `executeMintRequest`.
@@ -86,7 +86,7 @@ function seriesAMint(
 ) public
 ```
 
-Any one is able to call `seriesAMint` before reach the mintable limitation. 
+Any one is able to call `seriesAMint` before reach the mintable limitation.
 
 #### Actors
 
@@ -316,27 +316,28 @@ The main feature of `DataExchange` contract are:
 ### Methods
 
 ```javascript
-function getData(bytes32 key) public view returns (bytes memory, uint256 timestamp)
+function getData(bytes32 key) public view returns (bytes memory, bool)
 ```
 
-Retreive data in bytes format. Retreiver need to decode to get the raw data. For example:
+Retreive data in bytes format and if the data exists. Retreiver need to decode to get the raw data. For example:
 
 ```solidity
 // to get a store tuple (uint256 value1, uint256 value2) with key DATA_KEY
-(bytes memory data, uint256 timestamp) = dataExchange.getData(DATA_KEY);
+(bytes memory data, bool exist) = dataExchange.getData(DATA_KEY);
+require(exist, "data for key is not exist");
 (uint256 value1, uint256 value2) = abi.decode(data, (uint256, uint256));
 ```
 
 ```javascript
-function pushDataFromL1(
+function feedDataFromL1(
 	bytes32 key,
 	bytes calldata data,
 	address inbox,
 	uint256 maxGas,
 	uint256 gasPriceBid
 ) public onlyL1
-    
-function tryPushDataFromL1(
+
+function tryFeedDataFromL1(
 	bytes32 key,
 	bytes calldata data,
  	address inbox,
@@ -345,27 +346,27 @@ function tryPushDataFromL1(
 ) public onlyL1
 ```
 
-Send data from L1 to L2. 
+Send data from L1 to L2.
 
 ```javascript
-function pushDataFromL2(bytes32 key, bytes calldata data) public onlyL2
+function feedDataFromL2(bytes32 key, bytes calldata data) public onlyL2
 
-function tryPushDataFromL2(bytes32 key, bytes calldata data) public onlyL2
+function tryFeedDataFromL2(bytes32 key, bytes calldata data) public onlyL2
 ```
 
 Send data from L2 to L1.
 
-The method with prefix 'try' will not revert on error. 
+The method with prefix 'try' will not revert on error.
 
 #### Roles
 
-- **`DATA_EXCHANGE_ADMIN_ROLE`** is able to assign source for a data key. 
+- **`DATA_EXCHANGE_ADMIN_ROLE`** is able to assign source for a data key.
 
 - **L2 User** can send data to L2 to L1.
 
 - **L1 User** can send data from L1 to L2.
 
-  
+
 
 ### GovernorAlpha && Timelock
 
@@ -392,7 +393,7 @@ Changes:
 
 ### MintInitiator
 
-The `MintInitiator` contract is deployed on L2 network and only trusts admin of DAO. 
+The `MintInitiator` contract is deployed on L2 network and only trusts admin of DAO.
 
 When a MCB minting proposal succeeded, the execution will fire a transaction from `MintInitiator `, send a request to L1 then wait for the request appearing on the L1 network. The request finally can be executed by anyone on L1 to complete the minting process.
 

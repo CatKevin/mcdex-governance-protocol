@@ -28,10 +28,10 @@ contract DataExchange is Initializable {
 
     event UpdateDataSource(bytes32 key, address source);
 
-    event PushDataToL2(bytes32 key, bytes data, address inbox, uint256 maxGas, uint256 gasPriceBid);
+    event FeedDataToL2(bytes32 key, bytes data, address inbox, uint256 maxGas, uint256 gasPriceBid);
     event ReceiveDataFromL1(bytes32 key, bytes data);
 
-    event PushDataToL1(bytes32 key, bytes data);
+    event FeedDataToL1(bytes32 key, bytes data);
     event ReceiveDataFromL2(bytes32 key, bytes data);
 
     receive() external payable {}
@@ -73,11 +73,18 @@ contract DataExchange is Initializable {
     }
 
     /**
-     * @notice  Retreive data in bytes format. Retreiver need to decode to get the raw data.
+     * @notice  Retreive data in bytes format for given key. Retreiver need to decode to get the raw data.
      *          For one key, old data will be overriden by newer data.
      */
-    function getData(bytes32 key) public view returns (bytes memory, uint256 timestamp) {
-        return (dataValues[key], dataUpdateTimestamps[key]);
+    function getData(bytes32 key) public view returns (bytes memory, bool) {
+        return (dataValues[key], dataUpdateTimestamps[key] > 0);
+    }
+
+    /**
+     * @notice  Retreive the last updated timestamp for given key.
+     */
+    function getDataLastUpdateTimestamp(bytes32 key) public view returns (uint256) {
+        return dataUpdateTimestamps[key];
     }
 
     /**
@@ -112,42 +119,42 @@ contract DataExchange is Initializable {
      *
      * @dev     L1 only.
      */
-    function pushDataFromL1(
+    function feedDataFromL1(
         bytes32 key,
-        bytes calldata data,
+        bytes memory data,
         address inbox,
         uint256 maxGas,
         uint256 gasPriceBid
     ) public onlyL1 {
         require(isValidSource(key, msg.sender), "data source is invalid");
-        _pushDataFromL1(key, data, inbox, maxGas, gasPriceBid, true);
+        _feedDataFromL1(key, data, inbox, maxGas, gasPriceBid, true);
     }
 
     /**
      * @notice  Push data from L1 to L2 but will not revert if sender is not authorized.
      * @dev     L1 only.
      */
-    function tryPushDataFromL1(
+    function tryFeedDataFromL1(
         bytes32 key,
-        bytes calldata data,
+        bytes memory data,
         address inbox,
         uint256 maxGas,
         uint256 gasPriceBid
-    ) public onlyL1 {
+    ) public onlyL1 returns (bool) {
         if (!isValidSource(key, msg.sender)) {
-            return;
+            return false;
         }
-        _pushDataFromL1(key, data, inbox, maxGas, gasPriceBid, false);
+        return _feedDataFromL1(key, data, inbox, maxGas, gasPriceBid, false);
     }
 
-    function _pushDataFromL1(
+    function _feedDataFromL1(
         bytes32 key,
-        bytes calldata data,
+        bytes memory data,
         address inbox,
         uint256 maxGas,
         uint256 gasPriceBid,
         bool revertOnFailure
-    ) internal {
+    ) internal returns (bool) {
         require(_isValidInbox(inbox), "inbox is invalid");
         try
             IInbox(inbox).sendContractTransaction(
@@ -163,30 +170,33 @@ contract DataExchange is Initializable {
                 )
             )
         {
-            emit PushDataToL2(key, data, inbox, maxGas, gasPriceBid);
+            emit FeedDataToL2(key, data, inbox, maxGas, gasPriceBid);
+            return true;
         } catch Error(string memory reason) {
             if (revertOnFailure) {
                 revert(reason);
             }
+            return false;
         } catch {
             if (revertOnFailure) {
                 revert("fail to send transction to L2");
             }
+            return false;
         }
     }
 
     /**
-     * @notice  This is the receiving method for `pushDataFromL1`.
+     * @notice  This is the receiving method for `feedDataFromL1`.
      *          The key and data sent there will finally be passed in through arguments to this method.
      *          To avoid data rollback due to disorder, any data earlier than the timestamp of last update will be discard.
      */
     function receiveDataFromL1(
         bytes32 key,
         uint256 timestamp,
-        bytes calldata data
+        bytes memory data
     ) public onlyL2 {
         require(msg.sender == address(this), "data pusher is invalid");
-        if (timestamp < dataUpdateTimestamps[key]) {
+        if (timestamp <= dataUpdateTimestamps[key]) {
             return;
         }
         dataValues[key] = data;
@@ -198,7 +208,7 @@ contract DataExchange is Initializable {
      * @notice  Push data from L2 to L1.
      * @dev     L2 only.
      */
-    function pushDataFromL2(bytes32 key, bytes calldata data) public onlyL2 {
+    function feedDataFromL2(bytes32 key, bytes memory data) public onlyL2 {
         require(dataSources[key] == msg.sender, "data source is invalid");
         _pushDataFromL2(key, data, true);
     }
@@ -207,18 +217,18 @@ contract DataExchange is Initializable {
      * @notice  Push data from L2 to L1 but will not revert if sender is not authorized.
      * @notice  L2 only.
      */
-    function tryPushDataFromL2(bytes32 key, bytes calldata data) public onlyL2 {
+    function tryFeedDataFromL2(bytes32 key, bytes memory data) public onlyL2 returns (bool) {
         if (!isValidSource(key, msg.sender)) {
-            return;
+            return false;
         }
-        _pushDataFromL2(key, data, false);
+        return _pushDataFromL2(key, data, false);
     }
 
     function _pushDataFromL2(
         bytes32 key,
-        bytes calldata data,
+        bytes memory data,
         bool revertOnFailure
-    ) internal {
+    ) internal returns (bool) {
         try
             IArbSys(ARB_SYS_ADDRESS).sendTxToL1(
                 address(this),
@@ -230,29 +240,32 @@ contract DataExchange is Initializable {
                 )
             )
         {
-            emit PushDataToL1(key, data);
+            emit FeedDataToL1(key, data);
+            return true;
         } catch Error(string memory reason) {
             if (revertOnFailure) {
                 revert(reason);
             }
+            return false;
         } catch {
             if (revertOnFailure) {
                 revert("fail to send transction to L1");
             }
+            return false;
         }
     }
 
     /**
-     * @notice  This is the receiving method for `pushDataFromL2`.
+     * @notice  This is the receiving method for `feedDataFromL2`.
      * @notice  L1 only.
      */
     function receiveDataFromL2(
         bytes32 key,
         uint256 timestamp,
-        bytes calldata data
+        bytes memory data
     ) public onlyL1 {
         require(_getL2Sender(msg.sender) == address(this), "data pusher is invalid");
-        if (timestamp < dataUpdateTimestamps[key]) {
+        if (timestamp <= dataUpdateTimestamps[key]) {
             return;
         }
         dataValues[key] = data;

@@ -69,11 +69,16 @@ contract ValueCapture is Initializable {
      *                          admin interfaces.
      * @param   vault_          The address of vault contract. All funds later will be collected to this address.
      */
-    function initialize(address authenticator_, address vault_) external initializer {
+    function initialize(
+        address authenticator_,
+        address dataExchange_,
+        address vault_
+    ) external initializer {
         require(vault_ != address(0), "vault is the zero address");
         require(authenticator_.isContract(), "authenticator must be a contract");
 
         authenticator = IAuthenticator(authenticator_);
+        dataExchange = IDataExchange(dataExchange_);
         vault = vault_;
     }
 
@@ -187,16 +192,22 @@ contract ValueCapture is Initializable {
         uint256 normalizeAmountOut = amountOut.mul(normalizer);
         totalCapturedUSD = totalCapturedUSD.add(normalizeAmountOut);
         IERC20Upgradeable(tokenOut).safeTransfer(vault, amountOut);
-        pushCapturedValueToL1();
+        // ignore the result so that the sync won't stuck the foward procedure
+        dataExchange.tryFeedDataFromL2(
+            TOTAL_CAPTURED_USD_KEY,
+            abi.encode(totalCapturedUSD, _getBlockNumber())
+        );
 
         emit ForwardAsset(tokenOut, amountOut, normalizeAmountOut);
     }
 
-    function pushCapturedValueToL1() public {
-        dataExchange.pushDataFromL2(
-            TOTAL_CAPTURED_USD_KEY,
-            abi.encode(totalCapturedUSD, _getBlockTimestamp())
-        );
+    function feedCapturedValueToL1() public {
+        bool succeeded =
+            dataExchange.tryFeedDataFromL2(
+                TOTAL_CAPTURED_USD_KEY,
+                abi.encode(totalCapturedUSD, _getBlockNumber())
+            );
+        require(succeeded, "fail to feed captured value");
     }
 
     /**
@@ -257,7 +268,7 @@ contract ValueCapture is Initializable {
         emit ConvertToken(tokenIn, amountIn, tokenOut, amountOut);
     }
 
-    function _getBlockTimestamp() internal view virtual returns (uint256) {
-        return block.timestamp;
+    function _getBlockNumber() internal view virtual returns (uint256) {
+        return block.number;
     }
 }

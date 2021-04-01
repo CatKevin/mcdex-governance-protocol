@@ -10,6 +10,8 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "./interfaces/IL2ArbNetwork.sol";
 import "./interfaces/IDataExchange.sol";
 
+import "hardhat/console.sol";
+
 interface IValueCapture {
     function totalCapturedUSD() external view returns (uint256);
 }
@@ -90,6 +92,8 @@ contract Minter {
         uint256 seriesAMaxReleaseRate_
     ) {
         require(mcbToken_.isContract(), "token must be contract");
+        require(dataExchange_.isContract(), "data exchange must be contract");
+
         mcbToken = IMCB(mcbToken_);
         dataExchange = IDataExchange(dataExchange_);
         seriesA = seriesA_;
@@ -336,8 +340,12 @@ contract Minter {
     }
 
     function _getTotalCapturedUSD() internal view returns (uint256, uint256) {
-        (bytes memory data, uint256 timestamp) = dataExchange.getData(TOTAL_CAPTURED_USD_KEY);
-        return (abi.decode(data, (uint256)), timestamp);
+        (bytes memory data, bool exist) = dataExchange.getData(TOTAL_CAPTURED_USD_KEY);
+        if (!exist) {
+            return (0, 0);
+        }
+        require(data.length >= 64, "malformed raw data for captured value");
+        return abi.decode(data, (uint256, uint256));
     }
 
     function _getLastValueCapturedBlock() internal view returns (uint256) {

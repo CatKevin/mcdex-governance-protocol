@@ -74,7 +74,7 @@ describe('Minging', () => {
         const xmcb = await createContract("XMCB");
         await xmcb.initialize(auth.address, mcb.address, toWei("0.05"));
 
-        const rewardDistrubution = await createContract("TestRewardDistribution", [user0.address, xmcb.address]);
+        const rewardDistrubution = await createContract("TestRewardDistribution", [auth.address, xmcb.address]);
         await xmcb.addComponent(rewardDistrubution.address);
 
         await mcb.mint(user1.address, toWei("10000"));

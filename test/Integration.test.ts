@@ -74,8 +74,10 @@ describe('Integration', () => {
         const vault = await createContract("Vault");
         await vault.initialize(auth.address);
 
+        const dataExchange = await createContract("DataExchange");
+
         const valueCapture = await createContract("ValueCapture");
-        await valueCapture.initialize(auth.address, vault.address);
+        await valueCapture.initialize(auth.address, dataExchange.address, vault.address);
 
         await auth.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", timelock.address);
 

@@ -461,7 +461,9 @@ contract GovernorAlpha {
     }
 
     function _getMCBTotalSupply() internal view virtual returns (uint256) {
-        (bytes memory data, ) = IDataExchange(DATA_EXCHANGE_ADDRESS).getData(MCB_TOTAL_SUPPLY);
+        (bytes memory data, bool exist) =
+            IDataExchange(DATA_EXCHANGE_ADDRESS).getData(MCB_TOTAL_SUPPLY);
+        require(exist, "no total supply data feeded");
         return abi.decode(data, (uint256));
     }
 }

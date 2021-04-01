@@ -15,6 +15,7 @@ describe('ValueCapture', () => {
     let user2;
     let vault;
     let auth;
+    let dataExchange;
 
     before(async () => {
         accounts = await getAccounts();
@@ -25,7 +26,8 @@ describe('ValueCapture', () => {
 
         auth = await createContract("Authenticator");
         await auth.initialize();
-        // await auth.grantRole(ethers.utils.id("VALUE_CAPTURE_ADMIN_ROLE"), user0.address);
+
+        dataExchange = await createContract("MockDataExchange");
     })
 
     it("token whitelist", async () => {
@@ -35,7 +37,7 @@ describe('ValueCapture', () => {
         const usd3 = await createContract("CustomERC20", ["USD", "USD", 6]);
 
         const valueCapture = await createContract("ValueCapture");
-        await valueCapture.initialize(auth.address, vault.address)
+        await valueCapture.initialize(auth.address, dataExchange.address, vault.address)
 
         var tokens = await valueCapture.listUSDTokens(0, 100);
         expect(tokens.length).to.equal(0)
@@ -92,7 +94,7 @@ describe('ValueCapture', () => {
         await usd.mint(seller.address, toWei("10000"));
 
         const valueCapture = await createContract("ValueCapture");
-        await valueCapture.initialize(auth.address, vault.address)
+        await valueCapture.initialize(auth.address, dataExchange.address, vault.address)
 
         await valueCapture.addUSDToken(usd.address, 6);
         await valueCapture.setConvertor(mcb.address, oracle.address, seller.address, toWei("0.01")); // 1%
@@ -109,6 +111,7 @@ describe('ValueCapture', () => {
         expect(await usd.balanceOf(valueCapture.address)).to.equal(toWei("0"));
         expect(await usd.balanceOf(vault.address)).to.equal("500000000");
         expect(await valueCapture.totalCapturedUSD()).to.equal(toWei("500"))
+        expect(await dataExchange.getTotalCapturedUSD()).to.equal(toWei("500"))
     })
 
     it("valueCapture - 18", async () => {
@@ -119,7 +122,7 @@ describe('ValueCapture', () => {
 
 
         const valueCapture = await createContract("ValueCapture");
-        await valueCapture.initialize(auth.address, vault.address)
+        await valueCapture.initialize(auth.address, dataExchange.address, vault.address)
         await valueCapture.addUSDToken(usd.address, 18);
 
         // 1e18 mcb = 5e6 usd
@@ -139,6 +142,7 @@ describe('ValueCapture', () => {
         expect(await usd.balanceOf(valueCapture.address)).to.equal(toWei("0"));
         expect(await usd.balanceOf(vault.address)).to.equal(toWei("500"));
         expect(await valueCapture.totalCapturedUSD()).to.equal(toWei("500"))
+        expect(await dataExchange.getTotalCapturedUSD()).to.equal(toWei("500"))
     })
 
     it("valueCapture - admin", async () => {
@@ -150,7 +154,7 @@ describe('ValueCapture', () => {
         await auth.grantRole(ethers.utils.id("VALUE_CAPTURE_ADMIN_ROLE"), user2.address);
 
         const valueCapture = await createContract("ValueCapture");
-        await valueCapture.initialize(auth.address, vault.address)
+        await valueCapture.initialize(auth.address, dataExchange.address, vault.address)
         await expect(valueCapture.connect(user1).addUSDToken(usd.address, 18)).to.be.revertedWith("not authorized");
         await valueCapture.connect(user2).addUSDToken(usd.address, 18);
 
@@ -171,13 +175,14 @@ describe('ValueCapture', () => {
         expect(await usd.balanceOf(valueCapture.address)).to.equal(toWei("0"));
         expect(await usd.balanceOf(vault.address)).to.equal(toWei("500"));
         expect(await valueCapture.totalCapturedUSD()).to.equal(toWei("500"))
+        expect(await dataExchange.getTotalCapturedUSD()).to.equal(toWei("500"))
     })
 
     it("forward preset assets", async () => {
         const vault = await createContract("Vault");
 
         const valueCapture = await createContract("ValueCapture");
-        await valueCapture.initialize(auth.address, vault.address)
+        await valueCapture.initialize(auth.address, dataExchange.address, vault.address)
 
         const erc20 = await createContract("CustomERC20", ["ERC", "ERC", 18]);
         await erc20.mint(valueCapture.address, toWei("100"));
@@ -213,7 +218,7 @@ describe('ValueCapture', () => {
         const oracle = await createContract("MockTWAPOracle");
 
         const valueCapture = await createContract("ValueCapture");
-        await valueCapture.initialize(auth.address, vault.address)
+        await valueCapture.initialize(auth.address, dataExchange.address, vault.address)
 
         await valueCapture.addUSDToken(usd.address, 18);
 
@@ -248,7 +253,7 @@ describe('ValueCapture', () => {
         const oracle = await createContract("MockTWAPOracle");
 
         const valueCapture = await createContract("ValueCapture");
-        await valueCapture.initialize(auth.address, vault.address)
+        await valueCapture.initialize(auth.address, dataExchange.address, vault.address)
 
         const seller = await createContract("ConstantSeller", [mcb.address, usd.address, toWei("5")])
         await expect(valueCapture.setConvertor(mcb.address, oracle.address, seller.address, toWei("1.01"))).to.be.revertedWith("slippage tolerance is out of range")
