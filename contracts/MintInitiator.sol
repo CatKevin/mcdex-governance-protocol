@@ -76,4 +76,6 @@ contract MintInitiator is Initializable {
         );
         emit SendMintRequest(releaseType, recipient, amount);
     }
+
+    bytes32[50] private __gap;
 }

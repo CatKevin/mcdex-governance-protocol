@@ -368,4 +368,6 @@ contract Minter {
     function _getBlockNumber() internal view virtual returns (uint256) {
         return block.number;
     }
+
+    bytes32[50] private __gap;
 }

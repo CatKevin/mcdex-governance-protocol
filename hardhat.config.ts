@@ -98,6 +98,13 @@ module.exports = {
         hardhat: {
             // loggingEnabled: true
         },
+        arbtest: {
+            url: "http://10.30.204.119:8547",
+            gasPrice: 1e9,
+            accounts: ["dc1dfb1ba0850f1e808eb53e4c83f6a340cc7545e044f0a0f88c0e38dd3fa40d"],
+            timeout: 300000,
+            confirmations: 10,
+        },
         s10: {
             url: "http://server10.jy.mcarlo.com:8747",
             gasPrice: "auto",

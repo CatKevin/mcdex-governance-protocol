@@ -299,4 +299,6 @@ contract DataExchange is Initializable {
     function _getBlockTimestamp() internal view virtual returns (uint256) {
         return block.timestamp;
     }
+
+    bytes32[50] private __gap;
 }

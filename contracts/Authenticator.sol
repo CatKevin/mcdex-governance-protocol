@@ -28,4 +28,6 @@ contract Authenticator is Initializable, AccessControlUpgradeable {
     function hasRoleOrAdmin(bytes32 role, address account) public view returns (bool) {
         return hasRole(DEFAULT_ADMIN_ROLE, account) || hasRole(role, account);
     }
+
+    bytes32[50] private __gap;
 }

@@ -115,4 +115,6 @@ contract Vault is Initializable, ERC721HolderUpgradeable, ReentrancyGuardUpgrade
         AddressUpgradeable.functionCallWithValue(to, data, value);
         emit ExecuteTransaction(to, data, value);
     }
+
+    bytes32[50] private __gap;
 }

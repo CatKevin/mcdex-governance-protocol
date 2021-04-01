@@ -298,5 +298,5 @@ contract Comp is Initializable, ContextUpgradeable {
         return chainId;
     }
 
-    uint256[50] private __gap;
+    bytes32[50] private __gap;
 }

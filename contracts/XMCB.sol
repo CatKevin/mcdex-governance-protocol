@@ -208,5 +208,5 @@ contract XMCB is Initializable, ContextUpgradeable, Comp, BalanceBroadcaster {
     }
 
     // reserved for upgrade
-    uint256[50] private __gap;
+    bytes32[50] private __gap;
 }
