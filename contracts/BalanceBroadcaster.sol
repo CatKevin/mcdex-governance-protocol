@@ -54,14 +54,14 @@ contract BalanceBroadcaster is Initializable {
         return result;
     }
 
-    function _addListener(address component) internal {
+    function _addComponent(address component) internal {
         require(!_components.contains(component), "component already exists");
         require(IComponent(component).baseToken() == address(this), "owner of component mismatch");
         _components.add(component);
         emit AddListener(component);
     }
 
-    function _removeListener(address component) internal {
+    function _removeComponent(address component) internal {
         require(_components.contains(component), "component not exists");
         _components.remove(component);
         emit RemoveListener(component);

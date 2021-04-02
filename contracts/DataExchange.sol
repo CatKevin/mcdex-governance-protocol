@@ -92,7 +92,7 @@ contract DataExchange is Initializable {
      *          That means the whitelist will be stored in both L1 & L2 storage.
      * @dev     L2 only.
      */
-    function updateDataSource(bytes32 key, address source) public onlyL2 onlyAuthorized {
+    function updateDataSource(bytes32 key, address source) external onlyL2 onlyAuthorized {
         require(dataSources[key] != source, "data source is already exist");
         dataSources[key] = source;
         IArbSys(ARB_SYS_ADDRESS).sendTxToL1(
@@ -107,7 +107,7 @@ contract DataExchange is Initializable {
      *          When the source is set in L2, a sync message will be sent to L1 at the same time.
      * @dev     L1 only.
      */
-    function syncDataSourceFromL2(bytes32 key, address source) public onlyL1 {
+    function syncDataSourceFromL2(bytes32 key, address source) external onlyL1 {
         require(_getL2Sender(msg.sender) == address(this), "sender is invalid");
         require(dataSources[key] != source, "data source is already exist");
         dataSources[key] = source;
@@ -125,7 +125,7 @@ contract DataExchange is Initializable {
         address inbox,
         uint256 maxGas,
         uint256 gasPriceBid
-    ) public onlyL1 {
+    ) external onlyL1 {
         require(isValidSource(key, msg.sender), "data source is invalid");
         _feedDataFromL1(key, data, inbox, maxGas, gasPriceBid, true);
     }
@@ -140,11 +140,68 @@ contract DataExchange is Initializable {
         address inbox,
         uint256 maxGas,
         uint256 gasPriceBid
-    ) public onlyL1 returns (bool) {
+    ) external onlyL1 returns (bool) {
         if (!isValidSource(key, msg.sender)) {
             return false;
         }
         return _feedDataFromL1(key, data, inbox, maxGas, gasPriceBid, false);
+    }
+
+    /**
+     * @notice  This is the receiving method for `feedDataFromL1`.
+     *          The key and data sent there will finally be passed in through arguments to this method.
+     *          To avoid data rollback due to disorder, any data earlier than the timestamp of last update will be discard.
+     */
+    function receiveDataFromL1(
+        bytes32 key,
+        uint256 timestamp,
+        bytes memory data
+    ) external onlyL2 {
+        require(msg.sender == address(this), "data pusher is invalid");
+        if (timestamp <= dataUpdateTimestamps[key]) {
+            return;
+        }
+        dataValues[key] = data;
+        dataUpdateTimestamps[key] = timestamp;
+        emit ReceiveDataFromL1(key, data);
+    }
+
+    /**
+     * @notice  Push data from L2 to L1.
+     * @dev     L2 only.
+     */
+    function feedDataFromL2(bytes32 key, bytes memory data) external onlyL2 {
+        require(dataSources[key] == msg.sender, "data source is invalid");
+        _feedDataFromL2(key, data, true);
+    }
+
+    /**
+     * @notice  Push data from L2 to L1 but will not revert if sender is not authorized.
+     * @notice  L2 only.
+     */
+    function tryFeedDataFromL2(bytes32 key, bytes memory data) external onlyL2 returns (bool) {
+        if (!isValidSource(key, msg.sender)) {
+            return false;
+        }
+        return _feedDataFromL2(key, data, false);
+    }
+
+    /**
+     * @notice  This is the receiving method for `feedDataFromL2`.
+     * @notice  L1 only.
+     */
+    function receiveDataFromL2(
+        bytes32 key,
+        uint256 timestamp,
+        bytes memory data
+    ) external onlyL1 {
+        require(_getL2Sender(msg.sender) == address(this), "data pusher is invalid");
+        if (timestamp <= dataUpdateTimestamps[key]) {
+            return;
+        }
+        dataValues[key] = data;
+        dataUpdateTimestamps[key] = timestamp;
+        emit ReceiveDataFromL1(key, data);
     }
 
     function _feedDataFromL1(
@@ -185,46 +242,7 @@ contract DataExchange is Initializable {
         }
     }
 
-    /**
-     * @notice  This is the receiving method for `feedDataFromL1`.
-     *          The key and data sent there will finally be passed in through arguments to this method.
-     *          To avoid data rollback due to disorder, any data earlier than the timestamp of last update will be discard.
-     */
-    function receiveDataFromL1(
-        bytes32 key,
-        uint256 timestamp,
-        bytes memory data
-    ) public onlyL2 {
-        require(msg.sender == address(this), "data pusher is invalid");
-        if (timestamp <= dataUpdateTimestamps[key]) {
-            return;
-        }
-        dataValues[key] = data;
-        dataUpdateTimestamps[key] = timestamp;
-        emit ReceiveDataFromL1(key, data);
-    }
-
-    /**
-     * @notice  Push data from L2 to L1.
-     * @dev     L2 only.
-     */
-    function feedDataFromL2(bytes32 key, bytes memory data) public onlyL2 {
-        require(dataSources[key] == msg.sender, "data source is invalid");
-        _pushDataFromL2(key, data, true);
-    }
-
-    /**
-     * @notice  Push data from L2 to L1 but will not revert if sender is not authorized.
-     * @notice  L2 only.
-     */
-    function tryFeedDataFromL2(bytes32 key, bytes memory data) public onlyL2 returns (bool) {
-        if (!isValidSource(key, msg.sender)) {
-            return false;
-        }
-        return _pushDataFromL2(key, data, false);
-    }
-
-    function _pushDataFromL2(
+    function _feedDataFromL2(
         bytes32 key,
         bytes memory data,
         bool revertOnFailure
@@ -253,24 +271,6 @@ contract DataExchange is Initializable {
             }
             return false;
         }
-    }
-
-    /**
-     * @notice  This is the receiving method for `feedDataFromL2`.
-     * @notice  L1 only.
-     */
-    function receiveDataFromL2(
-        bytes32 key,
-        uint256 timestamp,
-        bytes memory data
-    ) public onlyL1 {
-        require(_getL2Sender(msg.sender) == address(this), "data pusher is invalid");
-        if (timestamp <= dataUpdateTimestamps[key]) {
-            return;
-        }
-        dataValues[key] = data;
-        dataUpdateTimestamps[key] = timestamp;
-        emit ReceiveDataFromL1(key, data);
     }
 
     function _isValidInbox(address inbox) internal view returns (bool) {

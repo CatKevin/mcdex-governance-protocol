@@ -63,7 +63,7 @@ contract MintInitiator is Initializable {
         uint8 releaseType,
         address recipient,
         uint256 amount
-    ) public onlyAuthorized {
+    ) external onlyAuthorized {
         IArbSys(ARB_SYS_ADDRESS).sendTxToL1(
             getL1Minter(),
             abi.encodeWithSignature(

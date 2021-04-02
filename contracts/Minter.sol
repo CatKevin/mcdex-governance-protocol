@@ -165,7 +165,7 @@ contract Minter {
     /**
      * @notice  Get the mintable amount for series-A.
      */
-    function getSeriesAMintableAmount() public returns (uint256) {
+    function getSeriesAMintableAmount() external returns (uint256) {
         updateMintableAmount();
         return seriesAMintableAmount.min(seriesAMaxSupply);
     }
@@ -173,7 +173,7 @@ contract Minter {
     /**
      * @notice  Get the mintable amount for base.
      */
-    function getBaseMintableAmount() public returns (uint256) {
+    function getBaseMintableAmount() external returns (uint256) {
         updateMintableAmount();
         return _getBaseMintableAmount().min(baseMaxSupply);
     }
@@ -187,7 +187,7 @@ contract Minter {
         uint256 maxSubmissionCost,
         uint256 maxGas,
         uint256 gasPriceBid
-    ) public {
+    ) external {
         updateMintableAmount();
         require(amount <= seriesAMintableAmount, "amount exceeds max mintable amount");
         _mintToL2(l2SeriesAVesting, amount, bridge, maxSubmissionCost, maxGas, gasPriceBid);
@@ -204,7 +204,7 @@ contract Minter {
         uint8 releaseType,
         address recipient,
         uint256 amount
-    ) public {
+    ) external {
         require(_getL2Sender(msg.sender) == MINT_INITIATOR_ADDRESS, "sender is not the initiator");
         uint256 index = mintRequests.length;
         mintRequests.push(
@@ -227,7 +227,7 @@ contract Minter {
         uint256 maxSubmissionCost,
         uint256 maxGas,
         uint256 gasPriceBid
-    ) public {
+    ) external {
         MintRequest storage request = mintRequests[index];
         require(request.releaseType != ReleaseType.None, "request has been executed");
         require(!request.executed, "request has been executed");

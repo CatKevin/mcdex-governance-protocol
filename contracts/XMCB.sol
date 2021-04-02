@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/GSN/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "./interfaces/IAuthenticator.sol";
@@ -19,6 +20,7 @@ contract XMCB is
     Comp,
     BalanceBroadcaster
 {
+    using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -56,6 +58,8 @@ contract XMCB is
         uint256 withdrawalPenaltyRate_
     ) external initializer {
         require(authenticator_ != address(0), "authenticator is the zero address");
+        require(rawToken_.isContract(), "raw token must be a contract");
+        require(withdrawalPenaltyRate_ <= WONE, "new withdrawalPenaltyRate exceed 100%");
 
         __Context_init();
         __ReentrancyGuard_init();
@@ -97,7 +101,7 @@ contract XMCB is
      * @param   withdrawalPenaltyRate_  A fixed-point decimal, when 1e18 == 100% and 1e16 == 1%.
      */
     function setWithdrawalPenaltyRate(uint256 withdrawalPenaltyRate_)
-        public
+        external
         virtual
         onlyAuthorized
     {
@@ -110,7 +114,7 @@ contract XMCB is
      * @notice  Deposit `rawToken` for XMCB token. The exchange rate is always 1:1.
      * @param   amount  The amount of `rawToken` to deposit.
      */
-    function deposit(uint256 amount) public virtual nonReentrant {
+    function deposit(uint256 amount) external virtual nonReentrant {
         require(amount > 0, "zero amount");
         _beforeMintingToken(_msgSender(), amount, _totalSupply);
         _deposit(_msgSender(), amount);
@@ -121,7 +125,7 @@ contract XMCB is
      *          User is expected to get `amount * (1 - withdrawalPenaltyRate)` token back.
      * @param   amount  The amount of `rawToken` to withdraw.
      */
-    function withdraw(uint256 amount) public virtual nonReentrant {
+    function withdraw(uint256 amount) external virtual nonReentrant {
         require(amount != 0, "zero amount");
         require(amount <= balanceOf(_msgSender()), "exceeded withdrawable balance");
         _beforeBurningToken(_msgSender(), amount, _totalSupply);
@@ -133,8 +137,8 @@ contract XMCB is
      *          notification from XMCB.
      * @param   component   The address of component to add.
      */
-    function addComponent(address component) public virtual onlyAuthorized {
-        _addListener(component);
+    function addComponent(address component) external virtual onlyAuthorized {
+        _addComponent(component);
     }
 
     /**
@@ -142,8 +146,8 @@ contract XMCB is
      *          notification from XMCB.
      * @param   component   The address of component to add.
      */
-    function removeComponent(address component) public virtual onlyAuthorized {
-        _removeListener(component);
+    function removeComponent(address component) external virtual onlyAuthorized {
+        _removeComponent(component);
     }
 
     function _deposit(address account, uint256 amount) internal virtual {

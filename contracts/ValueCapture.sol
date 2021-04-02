@@ -89,7 +89,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
      * @notice  Return all addresses of USD tokens in whitelist as an array.
      */
     function listUSDTokens(uint256 begin, uint256 end)
-        public
+        external
         view
         returns (address[] memory result)
     {
@@ -114,7 +114,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
      * @param   token       The address of usd token to be put into whitelist.
      * @param   decimals    The decimals of token.
      */
-    function addUSDToken(address token, uint256 decimals) public onlyAuthorized {
+    function addUSDToken(address token, uint256 decimals) external onlyAuthorized {
         require(!_usdTokenList.contains(token), "token already in usd list");
         require(token.isContract(), "token address must be contract");
         require(decimals >= 0 && decimals <= 18, "decimals out of range");
@@ -137,7 +137,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
      *
      * @param   token   The address of USD token to remove.
      */
-    function removeUSDToken(address token) public onlyAuthorized {
+    function removeUSDToken(address token) external onlyAuthorized {
         require(_usdTokenList.contains(token), "token not in usd list");
 
         bool isRemoved = _usdTokenList.remove(token);
@@ -163,7 +163,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
         address oracle,
         address convertor_,
         uint256 slippageTolerance
-    ) public onlyAuthorized {
+    ) external onlyAuthorized {
         require(slippageTolerance <= 1e18, "slippage tolerance is out of range");
         require(oracle.isContract(), "oracle must be a contract");
         require(convertor_.isContract(), "convertor must be a contract");
