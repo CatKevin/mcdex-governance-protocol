@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD
 pragma solidity 0.7.4;
 pragma experimental ABIEncoderV2;
 

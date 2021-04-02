@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: BSD
 pragma solidity 0.7.4;
 pragma experimental ABIEncoderV2;
 
@@ -65,7 +65,7 @@ contract Comp is Initializable, ContextUpgradeable {
     /// @notice The standard EIP-20 approval event
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
-    function __Comp_init_unchained() internal initializer {}
+    function __Comp_init() internal initializer {}
 
     function totalSupply() public view virtual returns (uint256) {
         return _totalSupply;

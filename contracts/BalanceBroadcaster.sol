@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL
 pragma solidity 0.7.4;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -6,7 +6,6 @@ import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-// import "./libraries/SafeOwnable.sol";
 import "./interfaces/IComponent.sol";
 
 contract BalanceBroadcaster is Initializable {
@@ -18,7 +17,7 @@ contract BalanceBroadcaster is Initializable {
     event AddListener(address indexed component);
     event RemoveListener(address indexed component);
 
-    function __BalanceBroadcaster_init_unchained() internal virtual initializer {}
+    function __BalanceBroadcaster_init() internal virtual initializer {}
 
     /**
      * @notice  Return the count of registered components.

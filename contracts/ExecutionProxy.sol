@@ -1,5 +1,5 @@
+// SPDX-License-Identifier: GPL
 pragma solidity 0.7.4;
-// SPDX-License-Identifier: UNLICENSED
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";

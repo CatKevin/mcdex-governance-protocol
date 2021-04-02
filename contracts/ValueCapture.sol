@@ -1,13 +1,14 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL
 pragma solidity 0.7.4;
 
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "./libraries/TokenConversion.sol";
 import "./interfaces/IAuthenticator.sol";
@@ -17,7 +18,7 @@ interface IDecimals {
     function decimals() external view returns (uint8);
 }
 
-contract ValueCapture is Initializable {
+contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
     using SafeMathUpgradeable for uint256;
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -76,6 +77,8 @@ contract ValueCapture is Initializable {
     ) external initializer {
         require(vault_ != address(0), "vault is the zero address");
         require(authenticator_.isContract(), "authenticator must be a contract");
+
+        __ReentrancyGuard_init();
 
         authenticator = IAuthenticator(authenticator_);
         dataExchange = IDataExchange(dataExchange_);
@@ -178,7 +181,7 @@ contract ValueCapture is Initializable {
      *
      * @param   token   The address of token to forward to vault.
      */
-    function forwardAsset(address token, uint256 amountIn) public {
+    function forwardAsset(address token, uint256 amountIn) external nonReentrant {
         require(vault != address(0), "vault is not set");
         require(amountIn != 0, "amount in is zero");
 
@@ -201,7 +204,7 @@ contract ValueCapture is Initializable {
         emit ForwardAsset(tokenOut, amountOut, normalizeAmountOut);
     }
 
-    function feedCapturedValueToL1() public {
+    function feedCapturedValueToL1() external nonReentrant {
         bool succeeded =
             dataExchange.tryFeedDataFromL2(
                 TOTAL_CAPTURED_USD_KEY,
@@ -215,7 +218,7 @@ contract ValueCapture is Initializable {
      *
      *          *Asset sent though this method to vault will not affect mintable amount of MCB.*
      */
-    function forwardETH(uint256 amount) public onlyAuthorized {
+    function forwardETH(uint256 amount) external onlyAuthorized nonReentrant {
         require(vault != address(0), "vault is not set");
         AddressUpgradeable.sendValue(payable(vault), amount);
         emit ForwardETH(amount);
@@ -228,7 +231,7 @@ contract ValueCapture is Initializable {
      *
      *          *Asset sent though this method to vault will not affect mintable amount of MCB.*
      */
-    function forwardERC20Token(address token, uint256 amount) public onlyAuthorized {
+    function forwardERC20Token(address token, uint256 amount) external onlyAuthorized nonReentrant {
         require(vault != address(0), "vault is not set");
         IERC20Upgradeable(token).safeTransfer(vault, amount);
         emit ForwardERC20Token(token, amount);
@@ -239,7 +242,11 @@ contract ValueCapture is Initializable {
      *
      *          *Asset sent though this method to vault will not affect mintable amount of MCB.*
      */
-    function forwardERC721Token(address token, uint256 tokenID) public onlyAuthorized {
+    function forwardERC721Token(address token, uint256 tokenID)
+        external
+        onlyAuthorized
+        nonReentrant
+    {
         require(vault != address(0), "vault is not set");
         IERC721Upgradeable(token).safeTransferFrom(address(this), vault, tokenID);
         emit ForwardERC721Token(token, tokenID);

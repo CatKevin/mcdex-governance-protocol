@@ -1,18 +1,24 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL
 pragma solidity 0.7.4;
 
 import "@openzeppelin/contracts-upgradeable/GSN/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "./interfaces/IAuthenticator.sol";
 
 import "./Comp.sol";
 import "./BalanceBroadcaster.sol";
 
-contract XMCB is Initializable, ContextUpgradeable, Comp, BalanceBroadcaster {
+contract XMCB is
+    Initializable,
+    ReentrancyGuardUpgradeable,
+    ContextUpgradeable,
+    Comp,
+    BalanceBroadcaster
+{
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -51,9 +57,10 @@ contract XMCB is Initializable, ContextUpgradeable, Comp, BalanceBroadcaster {
     ) external initializer {
         require(authenticator_ != address(0), "authenticator is the zero address");
 
-        __Context_init_unchained();
-        __Comp_init_unchained();
-        __BalanceBroadcaster_init_unchained();
+        __Context_init();
+        __ReentrancyGuard_init();
+        __Comp_init();
+        __BalanceBroadcaster_init();
 
         authenticator = IAuthenticator(authenticator_);
         rawToken = IERC20Upgradeable(rawToken_);
@@ -103,7 +110,7 @@ contract XMCB is Initializable, ContextUpgradeable, Comp, BalanceBroadcaster {
      * @notice  Deposit `rawToken` for XMCB token. The exchange rate is always 1:1.
      * @param   amount  The amount of `rawToken` to deposit.
      */
-    function deposit(uint256 amount) public virtual {
+    function deposit(uint256 amount) public virtual nonReentrant {
         require(amount > 0, "zero amount");
         _beforeMintingToken(_msgSender(), amount, _totalSupply);
         _deposit(_msgSender(), amount);
@@ -114,7 +121,7 @@ contract XMCB is Initializable, ContextUpgradeable, Comp, BalanceBroadcaster {
      *          User is expected to get `amount * (1 - withdrawalPenaltyRate)` token back.
      * @param   amount  The amount of `rawToken` to withdraw.
      */
-    function withdraw(uint256 amount) public virtual {
+    function withdraw(uint256 amount) public virtual nonReentrant {
         require(amount != 0, "zero amount");
         require(amount <= balanceOf(_msgSender()), "exceeded withdrawable balance");
         _beforeBurningToken(_msgSender(), amount, _totalSupply);

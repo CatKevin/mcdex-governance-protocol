@@ -20,7 +20,7 @@ contract TestRewardDistribution is RewardDistribution {
         mockBlockNumber = mockBlockNumber + count;
     }
 
-    function _blockNumber() internal view virtual override returns (uint256) {
+    function _getBlockNumber() internal view virtual override returns (uint256) {
         if (mockBlockNumber > 0) {
             return mockBlockNumber;
         }

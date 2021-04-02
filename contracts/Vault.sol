@@ -1,5 +1,5 @@
+// SPDX-License-Identifier: GPL
 pragma solidity 0.7.4;
-// SPDX-License-Identifier: UNLICENSED
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
@@ -51,6 +51,9 @@ contract Vault is Initializable, ERC721HolderUpgradeable, ReentrancyGuardUpgrade
      */
     function initialize(address authenticator_) external initializer {
         require(authenticator_ != address(0), "authenticator is the zero address");
+
+        __ReentrancyGuard_init();
+
         authenticator = IAuthenticator(authenticator_);
     }
 

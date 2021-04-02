@@ -1,22 +1,19 @@
-// SPDX-License-Identifier: GPL
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.7.4;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
-import "./interfaces/IL2ArbNetwork.sol";
-import "./interfaces/IAuthenticator.sol";
+import "../interfaces/IL2ArbNetwork.sol";
+import "../interfaces/IAuthenticator.sol";
 
-/**
- * @notice  DataExchange is a contract for data exchanging between L1 and L2 at the same address.
- */
-contract DataExchange is Initializable {
+contract TestDataExchange is Initializable {
     using AddressUpgradeable for address;
 
     bytes32 public constant DATA_EXCHANGE_ADMIN_ROLE = keccak256("DATA_EXCHANGE_ADMIN_ROLE");
     address public constant ARB_SYS_ADDRESS = 0x0000000000000000000000000000000000000064;
-    address public constant ROLLUP_ADDRESS = 0xC0250Ed5Da98696386F13bE7DE31c1B54a854098;
+    address public constant ROLLUP_ADDRESS = 0x19914a2873136aE17E25E4eff6088BF17f3ea3a3;
     uint256 public constant CHAINID_MASK =
         0x0000000000000000000000000000000000000000000000000000FFFFFFFFFFFF;
 

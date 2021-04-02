@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL
 pragma solidity 0.7.4;
 
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -66,14 +66,23 @@ contract RewardDistribution is Context, Ownable {
     }
 
     constructor(address authenticator_, address XMCB_) Ownable() {
+        require(authenticator_.isContract(), "authenticator must be a contract");
+        require(XMCB_.isContract(), "authenticator must be a contract");
+
         authenticator = IAuthenticator(authenticator_);
         xmcb = IXMCB(XMCB_);
     }
 
+    /**
+     * @notice  The address of base token.
+     */
     function baseToken() public view returns (address) {
         return address(xmcb);
     }
 
+    /**
+     * @notice  Implement of IComponent interface which is call when user deposits MCB into XMCB.
+     */
     function beforeMintingToken(
         address account,
         uint256,
@@ -85,6 +94,9 @@ contract RewardDistribution is Context, Ownable {
         }
     }
 
+    /**
+     * @notice  Implement of IComponent interface which is call when user withdraws MCB from XMCB.
+     */
     function beforeBurningToken(
         address account,
         uint256,
@@ -97,11 +109,15 @@ contract RewardDistribution is Context, Ownable {
     }
 
     /**
+     * @notice  Check if there is any reward plan for given token.
      */
     function hasPlan(address token) public view returns (bool) {
         return address(_rewardPlans[token].rewardToken) != address(0);
     }
 
+    /**
+     * @notice  Create a new reward plan for given token, setting the reward rate. Duplicated creation will be reverted.
+     */
     function createRewardPlan(address token, uint256 rewardRate) public onlyAuthorized {
         require(token != address(0), "invalid reward token");
         require(token.isContract(), "reward token must be contract");
@@ -112,6 +128,9 @@ contract RewardDistribution is Context, Ownable {
         emit RewardPlanCreated(token, rewardRate);
     }
 
+    /**
+     * @notice  Get the reward tokens, including the finished reward plan.
+     */
     function getRewardTokens() public view returns (address[] memory) {
         uint256 tokenCount = _activeReward.length();
         address[] memory results = new address[](tokenCount);
@@ -121,6 +140,9 @@ contract RewardDistribution is Context, Ownable {
         return results;
     }
 
+    /**
+     * @notice  Get the finished time and reward rate of a reward plan.
+     */
     function getRewardPlan(address token) public view returns (uint256, uint256) {
         RewardPlan storage plan = _rewardPlans[token];
         return (plan.periodFinish, plan.rewardRate);
@@ -141,14 +163,14 @@ contract RewardDistribution is Context, Ownable {
     {
         RewardPlan storage plan = _rewardPlans[token];
         if (newRewardRate == 0) {
-            plan.periodFinish = _blockNumber();
+            plan.periodFinish = _getBlockNumber();
         } else if (plan.periodFinish != 0) {
             plan.periodFinish = plan
                 .periodFinish
                 .sub(plan.lastUpdateTime)
                 .mul(plan.rewardRate)
                 .div(newRewardRate)
-                .add(_blockNumber());
+                .add(_getBlockNumber());
         }
         emit RewardRateChanged(plan.rewardRate, newRewardRate, plan.periodFinish);
         plan.rewardRate = newRewardRate;
@@ -172,9 +194,9 @@ contract RewardDistribution is Context, Ownable {
         require(plan.rewardRate > 0, "rewardRate is zero");
         uint256 period = reward.div(plan.rewardRate);
         // already finished or not initialized
-        if (_blockNumber() > plan.periodFinish) {
-            plan.lastUpdateTime = _blockNumber();
-            plan.periodFinish = _blockNumber().add(period);
+        if (_getBlockNumber() > plan.periodFinish) {
+            plan.lastUpdateTime = _getBlockNumber();
+            plan.periodFinish = _getBlockNumber().add(period);
         } else {
             // not finished or not initialized
             plan.periodFinish = plan.periodFinish.add(period);
@@ -187,7 +209,7 @@ contract RewardDistribution is Context, Ownable {
      */
     function lastTimeRewardApplicable(address token) public view returns (uint256) {
         RewardPlan storage plan = _rewardPlans[token];
-        return _blockNumber() <= plan.periodFinish ? _blockNumber() : plan.periodFinish;
+        return _getBlockNumber() <= plan.periodFinish ? _getBlockNumber() : plan.periodFinish;
     }
 
     /**
@@ -257,7 +279,7 @@ contract RewardDistribution is Context, Ownable {
         }
     }
 
-    function _blockNumber() internal view virtual returns (uint256) {
+    function _getBlockNumber() internal view virtual returns (uint256) {
         return block.number;
     }
 }

@@ -1,6 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL
 pragma solidity 0.7.4;
-pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/MathUpgradeable.sol";
@@ -14,7 +13,7 @@ import "./interfaces/IAuthenticator.sol";
 
 /**
  * @notice  MintInitiator is used to send mint request submitted from DAO from L2 to L1.
- * @dev     MintInitiator should be deployed on L2.
+ * @dev     MintInitiator will be deployed on L2.
  */
 contract MintInitiator is Initializable {
     using AddressUpgradeable for address;

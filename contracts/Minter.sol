@@ -1,29 +1,20 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL
 pragma solidity 0.7.4;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/math/MathUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/math/Math.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./interfaces/IL2ArbNetwork.sol";
 import "./interfaces/IDataExchange.sol";
-
-import "hardhat/console.sol";
-
-interface IValueCapture {
-    function totalCapturedUSD() external view returns (uint256);
-}
-
-interface IMCB is IERC20Upgradeable {
-    function mint(address account, uint256 amount) external;
-}
+import "./interfaces/IValueCapture.sol";
+import "./interfaces/IMCB.sol";
 
 contract Minter {
-    using AddressUpgradeable for address;
-    using MathUpgradeable for uint256;
-    using SafeMathUpgradeable for uint256;
+    using Address for address;
+    using SafeMath for uint256;
+    using Math for uint256;
 
     address public constant MINT_INITIATOR_ADDRESS = 0xC0250Ed5Da98696386F13bE7DE31c1B54a854098;
     address public constant ROLLUP_ADDRESS = 0xC0250Ed5Da98696386F13bE7DE31c1B54a854098;
@@ -39,7 +30,7 @@ contract Minter {
     }
 
     address public devAccount;
-    address public seriesA;
+    address public l2SeriesAVesting;
 
     uint256 public totalCapturedValue;
     uint256 public lastValueCapturedBlock;
@@ -84,7 +75,7 @@ contract Minter {
     constructor(
         address mcbToken_,
         address dataExchange_,
-        address seriesA_,
+        address l2SeriesAVesting_,
         address devAccount_,
         uint256 baseMaxSupply_,
         uint256 seriesAMaxSupply_,
@@ -96,8 +87,9 @@ contract Minter {
 
         mcbToken = IMCB(mcbToken_);
         dataExchange = IDataExchange(dataExchange_);
-        seriesA = seriesA_;
+        l2SeriesAVesting = l2SeriesAVesting_;
         devAccount = devAccount_;
+
         require(
             baseMaxSupply_.add(seriesAMaxSupply_).add(mcbToken.totalSupply()) <= mcbTotalSupply(),
             "base + series-a exceeds total supply"
@@ -198,7 +190,7 @@ contract Minter {
     ) public {
         updateMintableAmount();
         require(amount <= seriesAMintableAmount, "amount exceeds max mintable amount");
-        _mintToL2(seriesA, amount, bridge, maxSubmissionCost, maxGas, gasPriceBid);
+        _mintToL2(l2SeriesAVesting, amount, bridge, maxSubmissionCost, maxGas, gasPriceBid);
         seriesAMintableAmount = seriesAMintableAmount.sub(amount);
         seriesAMintedAmount = seriesAMintedAmount.add(amount);
         require(seriesAMintedAmount <= seriesAMaxSupply, "minted amount exceeds max supply");
@@ -268,6 +260,9 @@ contract Minter {
         emit MintToL1(recipient, amount);
     }
 
+    /**
+     * @dev Mint MCB to self, then call bridge method to push token to L2.
+     */
     function _mintToL2(
         address recipient,
         uint256 amount,
