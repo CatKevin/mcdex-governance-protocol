@@ -331,7 +331,9 @@ contract Minter {
         uint256 elapsedBlock = capturedTimestamp.sub(_getLastValueCapturedBlock());
         uint256 baseMintableAmount = elapsedBlock.mul(baseMinReleaseRate);
         if (incrementalCapturedValue > baseMintableAmount) {
-            extraMintableAmount = incrementalCapturedValue.sub(baseMintableAmount);
+            extraMintableAmount = extraMintableAmount.add(
+                incrementalCapturedValue.sub(baseMintableAmount)
+            );
         }
         lastValueCapturedBlock = capturedTimestamp;
         totalCapturedValue = capturedValue;
