@@ -66,7 +66,7 @@ contract MintInitiator is Initializable {
         IArbSys(ARB_SYS_ADDRESS).sendTxToL1(
             getL1Minter(),
             abi.encodeWithSignature(
-                "receiveMintRequestFromL2(uint8,address,uint256)",
+                "receiveBaseMintRequestFromL2(uint8,address,uint256)",
                 releaseType,
                 recipient,
                 amount

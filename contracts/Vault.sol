@@ -13,8 +13,6 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 
 import "./interfaces/IAuthenticator.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @notice  Vault is a contract to hold various assets from different source.
  */
