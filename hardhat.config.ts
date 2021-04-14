@@ -7,6 +7,8 @@ import "hardhat-contract-sizer";
 // import "hardhat-abi-exporter";
 import "solidity-coverage"
 
+import { checkAuth, updateDataSource } from './scripts/dataExchangeTools'
+
 task("accounts", "Prints the list of accounts", async (args, hre) => {
     const accounts = await hre.ethers.getSigners();
 
@@ -91,12 +93,47 @@ task("call", "Call contract function")
     })
 
 
+task("checkAuth", "CONTRACT_CALL")
+    .addOptionalPositionalParam("key", "bytes32")
+    .addOptionalPositionalParam("account", "address")
+    .setAction(async (args, hre) => {
+        if (!args.key.startsWith("0x")) {
+            args.key = hre.ethers.utils.id(args.key)
+        }
+        await checkAuth(hre, args.key, args.account)
+    })
+
+
+task("updateDataSource", "CONTRACT_CALL")
+    .addOptionalPositionalParam("key", "bytes32")
+    .addOptionalPositionalParam("account", "address")
+    .setAction(async (args, hre) => {
+        await updateDataSource(hre, hre.ethers.utils.id(args.key), args.account)
+    })
+
+// task("updateDataSource", "CONTRACT_CALL")
+//     .addOptionalPositionalParam("key", "bytes32")
+//     .addOptionalPositionalParam("account", "address")
+//     .setAction(async (args, hre) => {
+//         await updateDataSource(hre, hre.ethers.utils.id(args.key), args.account)
+//     })
+
+
+
 
 module.exports = {
     defaultNetwork: "hardhat",
     networks: {
         hardhat: {
             // loggingEnabled: true
+        },
+        tc: {
+            url: "http://10.30.204.119:8547",
+            gasPrice: 0,
+            accounts: ["b49bdc31d49ece2ee667de5c0b378ce193af4153c554db624db71696911ac6c6"],
+            timeout: 300000,
+            confirmations: 10,
+            l1URL: "http://10.30.204.119:7545",
         },
         arbtest: {
             url: "http://10.30.204.119:8547",

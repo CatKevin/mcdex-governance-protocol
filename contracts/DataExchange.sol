@@ -16,7 +16,7 @@ contract DataExchange is Initializable {
 
     bytes32 public constant DATA_EXCHANGE_ADMIN_ROLE = keccak256("DATA_EXCHANGE_ADMIN_ROLE");
     address public constant ARB_SYS_ADDRESS = 0x0000000000000000000000000000000000000064;
-    address public constant ROLLUP_ADDRESS = 0xC0250Ed5Da98696386F13bE7DE31c1B54a854098;
+    address public constant ROLLUP_ADDRESS = 0x19914a2873136aE17E25E4eff6088BF17f3ea3a3;
     uint256 public constant CHAINID_MASK =
         0x0000000000000000000000000000000000000000000000000000FFFFFFFFFFFF;
 
@@ -50,7 +50,7 @@ contract DataExchange is Initializable {
     }
 
     modifier onlyL2() {
-        require(!_isL2Net(), "method is only available on L2");
+        require(_isL2Net(), "method is only available on L2");
         _;
     }
 
@@ -93,7 +93,7 @@ contract DataExchange is Initializable {
      * @dev     L2 only.
      */
     function updateDataSource(bytes32 key, address source) external onlyL2 onlyAuthorized {
-        require(dataSources[key] != source, "data source is already exist");
+        // require(dataSources[key] != source, "data source is already exist");
         dataSources[key] = source;
         IArbSys(ARB_SYS_ADDRESS).sendTxToL1(
             address(this),

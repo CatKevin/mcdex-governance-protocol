@@ -1,13 +1,8 @@
-const { ethers } = require("hardhat");
+const chalk = require('chalk')
 
 export function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-export function toWei(n) { return ethers.utils.parseEther(n) };
-export function fromWei(n) { return ethers.utils.formatEther(n); }
-
-
 
 export async function ensureFinished(transation): Promise<any> {
     const result = await transation;
@@ -17,4 +12,12 @@ export async function ensureFinished(transation): Promise<any> {
         await result.wait()
     }
     return result
+}
+
+export function printInfo(...message) {
+    console.log(chalk.yellow("INFO "), ...message)
+}
+
+export function printError(...message) {
+    console.log(chalk.red("ERRO "), ...message)
 }

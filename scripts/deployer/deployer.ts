@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 const chalk = require('chalk')
-const { ethers } = require("hardhat");
 
 import { retrieveLinkReferences } from "./linkReferenceParser"
 
@@ -21,6 +20,7 @@ export class Deployer {
 
     public SAVE_POSTFIX = '.deployment.js'
 
+    public ethers: any
     public options: DeploymentOptions
     public linkReferences = {}
     public deployedContracts = {}
@@ -29,7 +29,8 @@ export class Deployer {
     public beforeDeployed = null
     public afterDeployed = null
 
-    constructor(options: DeploymentOptions) {
+    constructor(ethers, options: DeploymentOptions) {
+        this.ethers = ethers
         this.options = options
     }
 
@@ -173,7 +174,7 @@ export class Deployer {
                 }
             }
         }
-        return await ethers.getContractFactory(contractName, { libraries: links })
+        return await this.ethers.getContractFactory(contractName, { libraries: links })
     }
 
     private _log(...message) {

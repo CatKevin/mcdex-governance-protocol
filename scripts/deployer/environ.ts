@@ -1,16 +1,24 @@
-const hre = require("hardhat");
 import { Deployer } from './deployer'
+import { printError } from './utils'
 
-export async function restorableEnviron(options, job, ...args) {
+export async function restorableEnviron(ethers, options, job, ...args) {
     // detect network
-    const deployer = new Deployer(options)
+    const deployer = new Deployer(ethers, options)
     await deployer.initialize();
     // main logic
     try {
         await job(deployer, ...args)
     } catch (err) {
-        console.log("Error occurs when deploying contracts:", err)
+        printError("Error occurs when deploying contracts:", err)
     }
     // save deployed
     deployer.finalize()
+}
+
+export async function readOnlyEnviron(ethers, options, job) {
+    // detect network
+    const deployer = new Deployer(ethers, options)
+    await deployer.initialize();
+    // main logic
+    await job(deployer)
 }

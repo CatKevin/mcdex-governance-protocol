@@ -46,6 +46,9 @@ contract GovernorAlpha {
     /// @notice The address of the Compound governance token
     CompInterface public comp;
 
+    /// @notice The data exchange contract to exchange data between L1/L2
+    IDataExchange public dataExchange;
+
     /// @notice The address of the Governor Guardian
     address public guardian;
 
@@ -138,10 +141,12 @@ contract GovernorAlpha {
     event ProposalExecuted(uint256 id);
 
     constructor(
+        address dataExchange_,
         address timelock_,
         address comp_,
         address guardian_
     ) {
+        dataExchange = IDataExchange(dataExchange_);
         timelock = TimelockInterface(timelock_);
         comp = CompInterface(comp_);
         guardian = guardian_;
@@ -462,8 +467,7 @@ contract GovernorAlpha {
     }
 
     function _getMCBTotalSupply() internal view virtual returns (uint256) {
-        (bytes memory data, bool exist) =
-            IDataExchange(DATA_EXCHANGE_ADDRESS).getData(MCB_TOTAL_SUPPLY);
+        (bytes memory data, bool exist) = dataExchange.getData(MCB_TOTAL_SUPPLY);
         require(exist, "no total supply data feeded");
         return abi.decode(data, (uint256));
     }

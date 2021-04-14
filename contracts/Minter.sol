@@ -17,7 +17,7 @@ contract Minter {
     using Math for uint256;
 
     address public constant MINT_INITIATOR_ADDRESS = 0xC0250Ed5Da98696386F13bE7DE31c1B54a854098;
-    address public constant ROLLUP_ADDRESS = 0xC0250Ed5Da98696386F13bE7DE31c1B54a854098;
+    address public constant ROLLUP_ADDRESS = 0x19914a2873136aE17E25E4eff6088BF17f3ea3a3;
     bytes32 public constant TOTAL_CAPTURED_USD_KEY = keccak256("TOTAL_CAPTURED_USD_KEY");
 
     enum ReleaseType { None, ToL1, ToL2 }

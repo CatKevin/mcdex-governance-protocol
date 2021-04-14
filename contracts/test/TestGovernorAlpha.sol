@@ -14,7 +14,7 @@ contract TestGovernorAlpha is GovernorAlpha {
         address timelock_,
         address comp_,
         address guardian_
-    ) GovernorAlpha(timelock_, comp_, guardian_) {
+    ) GovernorAlpha(0x0000000000000000000000000000000000000000, timelock_, comp_, guardian_) {
         mockMCB = mcb_;
     }
 
@@ -50,5 +50,9 @@ contract TestGovernorAlpha is GovernorAlpha {
 
     function _getMCBTotalSupply() internal view virtual override returns (uint256) {
         return IERC20Upgradeable(mockMCB).totalSupply();
+    }
+
+    function votingPeriod() public pure virtual override returns (uint256) {
+        return 20;
     }
 }

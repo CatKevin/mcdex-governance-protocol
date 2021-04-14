@@ -26,4 +26,8 @@ contract TestTimelock is Timelock {
         }
         return block.timestamp;
     }
+
+    function forceSetDelay(uint256 delay_) public {
+        delay = delay_;
+    }
 }

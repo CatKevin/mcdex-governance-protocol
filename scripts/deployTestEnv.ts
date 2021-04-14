@@ -1,10 +1,12 @@
 const hre = require("hardhat")
 const ethers = hre.ethers
-const chalk = require('chalk')
 
 import { DeploymentOptions } from './deployer/deployer'
 import { restorableEnviron } from './deployer/environ'
-import { sleep, toWei, ensureFinished } from './deployer/utils'
+import { sleep, ensureFinished, printInfo, printError } from './deployer/utils'
+
+export function toWei(n) { return ethers.utils.parseEther(n) };
+export function fromWei(n) { return ethers.utils.formatEther(n); }
 
 const ENV: DeploymentOptions = {
     network: hre.network.name,
@@ -12,14 +14,6 @@ const ENV: DeploymentOptions = {
     addressOverride: {
         WETH9: "0xd0A1E359811322d97991E03f863a0C30C2cF029C",
     }
-}
-
-function info(...message) {
-    console.log(chalk.yellow("INFO "), ...message)
-}
-
-function error(...message) {
-    console.log(chalk.red("ERRO "), ...message)
 }
 
 async function deployDataExchange(deployer, authenticator) {
@@ -46,17 +40,17 @@ async function deployDataExchange(deployer, authenticator) {
         await ensureFinished(l2Deployed.initialize(authenticator.address))
         return { l1DataExchange: l1Deployed, l2DataExchange: l2Deployed }
     } catch (err) {
-        error(err)
+        printError(err)
         throw err
     } finally {
         // refund deployment funds
         let refund = await l1Wallet.getBalance()
-        info(`${refund} left`)
+        printInfo(`${refund} left`)
         const transferCost = ethers.BigNumber.from(feeTx.gasPrice).mul(ethers.BigNumber.from(25000))
-        // info(`${transferCost} for transfer fee`)
+        // printInfo(`${transferCost} for transfer fee`)
         if (refund.gt(transferCost)) {
             refund = refund.sub(transferCost)
-            info(`refund ${refund} to ${await ownerWallet.getAddress()}`);
+            printInfo(`refund ${refund} to ${await ownerWallet.getAddress()}`);
             await l1Wallet.sendTransaction({
                 to: await ownerWallet.getAddress(),
                 value: refund,
@@ -69,35 +63,37 @@ async function deployDataExchange(deployer, authenticator) {
 }
 
 async function main(deployer, accounts) {
+    await hre.run("compile");
+
     const owner = accounts[0]
     // authenticator
-    info("creating Authenticator ...")
+    printInfo("creating Authenticator ...")
     const authenticator = await deployer.deploy("Authenticator")
     await ensureFinished(authenticator.initialize());
-    info("done")
+    printInfo("done")
 
     // data exchange
-    info("creating DataExchange ...")
+    printInfo("creating DataExchange ...")
     await deployDataExchange(deployer, authenticator);
-    info("done")
+    printInfo("done")
 
     // fake mcb
-    info("creating Test MCB ...")
+    printInfo("creating Test MCB ...")
     const mcb = await deployer.deployAs("CustomERC20", "MCB", "MCB", "MCB", 18);
-    info("done")
+    printInfo("done")
 
     // xmcb
-    info("creating XMCB ...")
+    printInfo("creating XMCB ...")
     const xmcb = await deployer.deploy("XMCB");
     await ensureFinished(xmcb.initialize(
         deployer.addressOf("Authenticator"),
         deployer.addressOf("MCB"),
         toWei("0.05")
     ))
-    info("done")
+    printInfo("done")
 
     // timelock & governor
-    info("creating Voting System ...")
+    printInfo("creating Voting System ...")
     const timelock = await deployer.deploy("Timelock", owner.address, 0);
     const governor = await deployer.deploy(
         "FastGovernorAlpha",
@@ -141,23 +137,23 @@ async function main(deployer, accounts) {
     ))
 
     await ensureFinished(governor.__acceptAdmin())
-    info("done")
+    printInfo("done")
 
     // vault
-    info("creating Vault ...")
+    printInfo("creating Vault ...")
     const vault = await deployer.deploy("Vault");
     await ensureFinished(vault.initialize(authenticator.address));
-    info("done")
+    printInfo("done")
 
     // value capture
-    info("creating Vault Capture ...")
+    printInfo("creating Vault Capture ...")
     const valueCapture = await deployer.deploy("ValueCapture");
     await ensureFinished(valueCapture.initialize(authenticator.address, deployer.addressOf("DataExchange"), vault.address));
     await ensureFinished(authenticator.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", timelock.address));
-    info("done")
+    printInfo("done")
 
     // test in & out
-    info("creating Test Token Seller ...")
+    printInfo("creating Test Token Seller ...")
     const tokenIn1 = await deployer.deployAs("CustomERC20", "TKN1", "TKN1", "TKN1", 18);
     const tokenOu1 = await deployer.deployAs("CustomERC20", "USD1", "USD1", "USD1", 18);
 
@@ -168,17 +164,17 @@ async function main(deployer, accounts) {
 
     await ensureFinished(valueCapture.addUSDToken(tokenOu1.address, 18))
     await ensureFinished(valueCapture.setConvertor(tokenIn1.address, oracle.address, seller1.address, toWei("0.01")))
-    info("done")
+    printInfo("done")
 
     // reward distrubution && start mining
-    info("creating Reward Distribution ...")
+    printInfo("creating Reward Distribution ...")
     const rewardDistrubution = await deployer.deploy("TestRewardDistribution", authenticator.address, xmcb.address);
     await ensureFinished(xmcb.addComponent(rewardDistrubution.address));
     await ensureFinished(rewardDistrubution.createRewardPlan(mcb.address, toWei("0.2")))
     await ensureFinished(rewardDistrubution.notifyRewardAmount(mcb.address, toWei("20000")))
-    info("done")
+    printInfo("done")
 
-    info("creating Minter ...")
+    printInfo("creating Minter ...")
     await deployer.deploy("Minter",
         mcb.address,
         deployer.addressOf("DataExchange"),
@@ -189,13 +185,13 @@ async function main(deployer, accounts) {
         toWei("0.2"),
         toWei("0.55392"),
     )
-    info("done")
+    printInfo("done")
 }
 
 ethers.getSigners()
-    .then(accounts => restorableEnviron(ENV, main, accounts))
+    .then(accounts => restorableEnviron(ethers, ENV, main, accounts))
     .then(() => process.exit(0))
     .catch(error => {
-        console.error(error);
+        printError(error);
         process.exit(1);
     });

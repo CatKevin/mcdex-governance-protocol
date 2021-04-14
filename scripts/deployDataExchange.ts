@@ -3,7 +3,10 @@ const ethers = hre.ethers
 
 import { DeploymentOptions } from './deployer/deployer'
 import { restorableEnviron } from './deployer/environ'
-import { sleep } from './deployer/utils'
+import { sleep, ensureFinished, printInfo, printError } from './deployer/utils'
+
+export function toWei(n) { return ethers.utils.parseEther(n) };
+export function fromWei(n) { return ethers.utils.formatEther(n); }
 
 const ENV: DeploymentOptions = {
     network: hre.network.name,
@@ -13,71 +16,77 @@ const ENV: DeploymentOptions = {
     }
 }
 
-async function main(deployer, ...args) {
+async function deployDataExchange(deployer, authenticator) {
     const l1Provider = new ethers.providers.JsonRpcProvider("http://10.30.204.119:7545")
     const l2Provider = new ethers.providers.JsonRpcProvider("http://10.30.204.119:8547")
-    const refundRecipient = '0x02e8735cd053fc738170011F7eBc4117f285fE9D'
+
 
     let privateKey = ethers.utils.randomBytes(32)
     let l1Wallet = new ethers.Wallet(privateKey, l1Provider)
     let l2Wallet = new ethers.Wallet(privateKey, l2Provider)
+    let l1Owner = new ethers.Wallet(hre.network.config.accounts[0], l1Provider)
 
-    let isReady = false
-    console.log("checking nonce...")
-    while (!isReady) {
-        const l1TxCount = await l1Wallet.getTransactionCount();
-        const l2TxCount = await l1Wallet.getTransactionCount();
-        if (l1TxCount == 0 && l2TxCount == 0) {
-            isReady = true
-        } else {
-            privateKey = ethers.utils.randomBytes(32)
-            l1Wallet = new ethers.Wallet(privateKey, l1Provider)
-            l2Wallet = new ethers.Wallet(privateKey, l2Provider)
+    // send deployment funds
+    const ownerWallet = hre.ethers.provider.getSigner(0);
+    const feeTx = await ensureFinished(l1Owner.sendTransaction({
+        to: l1Wallet.address,
+        value: toWei("0.1"),
+        gasLimit: 25000,
+    }))
+
+    let l1Deployed
+    let l2Deployed
+    try {
+        l1Deployed = await deployer.deployWith(l1Wallet, "DataExchange")
+        l2Deployed = await deployer.deployWith(l2Wallet, "DataExchange")
+        await ensureFinished(l1Deployed.initialize(authenticator.address))
+        await ensureFinished(l2Deployed.initialize(authenticator.address))
+        return { l1DataExchange: l1Deployed, l2DataExchange: l2Deployed }
+    } catch (err) {
+        printError(err)
+        throw err
+    } finally {
+        // refund deployment funds
+        let refund = await l1Wallet.getBalance()
+        printInfo(`${refund} left`)
+        const transferCost = ethers.BigNumber.from(feeTx.gasPrice).mul(ethers.BigNumber.from(25000))
+        // printInfo(`${transferCost} for transfer fee`)
+        if (refund.gt(transferCost)) {
+            refund = refund.sub(transferCost)
+            printInfo(`refund ${refund} to ${await ownerWallet.getAddress()}`);
+            await l1Wallet.sendTransaction({
+                to: await ownerWallet.getAddress(),
+                value: refund,
+                gasLimit: 25000,
+                gasPrice: feeTx.gasPrice,
+            })
+
         }
     }
-    console.log(`done. temp private key is ${ethers.utils.hexlify(privateKey)}`)
-
-    isReady = false
-    console.log(`please transfer some ether to ${l1Wallet.address} to begin deployment...`);
-    while (!isReady) {
-        const fund = await l1Wallet.getBalance();
-        isReady = fund > 0
-        await sleep(3000)
-        process.stdout.write(".")
-    }
-    console.log(`done`);
-
-    try {
-        const l1Deployed = await deployer.deployWith(l1Wallet, "DataExchange")
-        const l2Deployed = await deployer.deployWith(l2Wallet, "DataExchange")
-    } catch (err) {
-        console.log("deployment interrupted, rolling back (refund):", err)
-    }
-
-    let refund = await l1Wallet.getBalance()
-    console.log(`${refund} left to refund`)
-
-    const gasPrice = hre.network.config.gasPrice
-    const transferCost = ethers.BigNumber.from(gasPrice).mul(ethers.BigNumber.from(23000))
-    console.log(`${transferCost} left to refund`)
-
-    if (refund.gt(transferCost)) {
-        refund = refund.sub(transferCost)
-        console.log(`refund ${refund} to ${refundRecipient}`);
-        await l1Wallet.sendTransaction({
-            to: refundRecipient,
-            value: refund,
-            gasLimit: 23000,
-        })
-        console.log(`done`);
-    }
-    return
 }
 
-export async function deployDataExchange() {
-    return await restorableEnviron(ENV, main)
+async function main(deployer, accounts) {
+    const owner = accounts[0]
+    const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000"
+    const TEST_DATA_KEY = ethers.utils.id("TEST_DATA_KEY")
+    // authenticator
+    printInfo("creating Authenticator ...")
+    const authenticator = await deployer.deploy("Authenticator")
+    await ensureFinished(authenticator.initialize());
+    printInfo("done")
+
+    // data exchange
+    printInfo("creating DataExchange ...")
+    const { l1DataExchange, l2DataExchange } = await deployDataExchange(deployer, authenticator);
+    printInfo("done")
 }
 
-restorableEnviron(ENV, main).then(console.log)
+ethers.getSigners()
+    .then(accounts => restorableEnviron(ethers, ENV, main, accounts))
+    .then(() => process.exit(0))
+    .catch(error => {
+        printError(error);
+        process.exit(1);
+    });
 
 
