@@ -5,13 +5,14 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./interfaces/IL2ArbNetwork.sol";
 import "./interfaces/IDataExchange.sol";
 import "./interfaces/IValueCapture.sol";
 import "./interfaces/IMCB.sol";
 
-contract Minter {
+contract Minter is ReentrancyGuard {
     using Address for address;
     using Math for uint256;
     using SafeMath for uint256;
@@ -185,7 +186,7 @@ contract Minter {
         uint8 releaseType,
         address recipient,
         uint256 amount
-    ) external {
+    ) external nonReentrant {
         require(_getL2Sender(msg.sender) == MINT_INITIATOR_ADDRESS, "sender is not the initiator");
         uint256 index = mintRequests.length;
         mintRequests.push(
@@ -208,7 +209,7 @@ contract Minter {
         uint256 maxSubmissionCost,
         uint256 maxGas,
         uint256 gasPriceBid
-    ) external {
+    ) external nonReentrant {
         MintRequest storage request = mintRequests[index];
         require(request.releaseType != ReleaseType.None, "request has been executed");
         require(!request.executed, "request has been executed");
@@ -252,7 +253,7 @@ contract Minter {
         uint256 maxSubmissionCost,
         uint256 maxGas,
         uint256 gasPriceBid
-    ) external {
+    ) external nonReentrant {
         require(amount <= seriesAMintableAmount, "amount exceeds max mintable amount");
         require(
             seriesAMintedAmount.add(amount) <= seriesAMaxSupply,
