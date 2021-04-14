@@ -85,14 +85,14 @@ contract XMCB is
      * @notice  Comparing to `balanceOf`, raw balance indicates the unweighted balance.
      *          This may be useful for other contract which takes XMCB's balance as reference.
      */
-    function rawBalanceOf(address account) public view virtual returns (uint256) {
+    function rawBalanceOf(address account) external view virtual returns (uint256) {
         return _balances[account];
     }
 
     /**
      * @notice  Like `rawBalanceOf`, this is the unweighted total supply.
      */
-    function rawTotalSupply() public view virtual returns (uint256) {
+    function rawTotalSupply() external view virtual returns (uint256) {
         return uint256(_rawTotalSupply);
     }
 

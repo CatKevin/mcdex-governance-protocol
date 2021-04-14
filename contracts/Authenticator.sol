@@ -24,7 +24,7 @@ contract Authenticator is Initializable, AccessControlUpgradeable {
      * @param   account The account to be checked.
      * @return  True if the account has already granted permissions for the given role.
      */
-    function hasRoleOrAdmin(bytes32 role, address account) public view returns (bool) {
+    function hasRoleOrAdmin(bytes32 role, address account) external view returns (bool) {
         return hasRole(DEFAULT_ADMIN_ROLE, account) || hasRole(role, account);
     }
 

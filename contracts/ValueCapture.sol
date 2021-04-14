@@ -117,7 +117,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
     function addUSDToken(address token, uint256 decimals) external onlyAuthorized {
         require(!_usdTokenList.contains(token), "token already in usd list");
         require(token.isContract(), "token address must be contract");
-        require(decimals >= 0 && decimals <= 18, "decimals out of range");
+        require(decimals <= 18, "decimals out of range");
         // verify decimals if possible
         try IDecimals(token).decimals() returns (uint8 actualDecimals) {
             require(actualDecimals == decimals, "decimals not match");
@@ -167,12 +167,11 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
         require(slippageTolerance <= 1e18, "slippage tolerance is out of range");
         require(oracle.isContract(), "oracle must be a contract");
         require(convertor_.isContract(), "convertor must be a contract");
-        require(
-            _usdTokenList.contains(IUSDConvertor(convertor_).tokenOut()),
-            "token out is not in usd list"
-        );
-        assetEntries[token].update(oracle, convertor_, slippageTolerance);
+        IUSDConvertor convertor = IUSDConvertor(convertor_);
+        require(token == convertor.tokenIn(), "input token mismatch");
+        require(_usdTokenList.contains(convertor.tokenOut()), "token out is not in usd list");
 
+        assetEntries[token].update(oracle, convertor_, slippageTolerance);
         emit SetConvertor(token, convertor_);
     }
 
@@ -267,6 +266,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
             amountOut = amountIn;
         } else {
             require(assetEntries[tokenIn].isAvailable(), "token has no convertor");
+            require(tokenIn == assetEntries[tokenIn].tokenIn(), "input token mismatch");
             // not necessary, but double check to prevent unexpected nested call.
             tokenOut = assetEntries[tokenIn].tokenOut();
             amountOut = assetEntries[tokenIn].convert(amountIn);

@@ -125,6 +125,7 @@ contract Minter {
      * @notice  Set the dev account who is the beneficiary of shares from minted MCB token.
      */
     function setDevAccount(address devAccount_) external {
+        require(devAccount_ != address(0x0), "zero address is not allowed");
         require(msg.sender == devAccount, "caller must be dev account");
         require(devAccount_ != devAccount, "already dev account");
         emit SetDevAccount(devAccount, devAccount_);
@@ -146,14 +147,14 @@ contract Minter {
      * @notice  Update the mintable amount for series-A separately.
      */
     function updateSeriesAMintableAmount() public {
-        if (_getBlockNumber() <= seriesALastUpdateBlock || extraMintableAmount == 0) {
+        if (_getBlockNumber() <= _getSeriesALastUpdateBlock() || extraMintableAmount == 0) {
             return;
         }
         uint256 remainSupply = seriesAMaxSupply.sub(seriesAMintedAmount).sub(seriesAMintableAmount);
         if (remainSupply == 0) {
             return;
         }
-        uint256 elapsedBlock = _getBlockNumber().sub(seriesALastUpdateBlock);
+        uint256 elapsedBlock = _getBlockNumber().sub(_getSeriesALastUpdateBlock());
         uint256 mintableAmount =
             elapsedBlock.mul(seriesAMaxReleaseRate).min(extraMintableAmount).min(remainSupply);
         // **TO SERIES A**: extra
@@ -307,14 +308,16 @@ contract Minter {
     function _mint(address recipient, uint256 amount) internal {
         require(recipient != address(0), "recipient is the zero address");
         require(amount > 0, "amount is zero");
+
         uint256 toDevAmount = amount.mul(devCommissionRate()).div(1e18);
         uint256 toRecipientAmount = amount.sub(toDevAmount);
-        mcbToken.mint(recipient, toRecipientAmount);
-        mcbToken.mint(devAccount, toDevAmount);
         require(
-            mcbToken.totalSupply() < mcbTotalSupply(),
+            mcbToken.totalSupply().add(amount) < mcbTotalSupply(),
             "minted amount exceeds max total supply"
         );
+
+        mcbToken.mint(recipient, toRecipientAmount);
+        mcbToken.mint(devAccount, toDevAmount);
 
         emit MintMCB(recipient, toRecipientAmount, devAccount, toDevAmount);
     }

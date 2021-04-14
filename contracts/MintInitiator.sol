@@ -19,7 +19,6 @@ contract MintInitiator is Initializable {
     using AddressUpgradeable for address;
 
     address public constant ARB_SYS_ADDRESS = 0x0000000000000000000000000000000000000064;
-    address public constant MCB_MINTER_ADDRESS = 0x0000000000000000000000000000000000000064;
 
     IAuthenticator public authenticator;
 
