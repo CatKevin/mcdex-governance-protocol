@@ -19,7 +19,6 @@ contract MintInitiator is Initializable {
     using AddressUpgradeable for address;
 
     address public constant ARB_SYS_ADDRESS = 0x0000000000000000000000000000000000000064;
-    address public constant MCB_MINTER_ADDRESS = 0x0000000000000000000000000000000000000064;
 
     IAuthenticator public authenticator;
 
@@ -67,7 +66,7 @@ contract MintInitiator is Initializable {
         IArbSys(ARB_SYS_ADDRESS).sendTxToL1(
             getL1Minter(),
             abi.encodeWithSignature(
-                "receiveMintRequestFromL2(uint8,address,uint256)",
+                "receiveBaseMintRequestFromL2(uint8,address,uint256)",
                 releaseType,
                 recipient,
                 amount

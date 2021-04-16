@@ -10,7 +10,6 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 import "../../interfaces/IAuthenticator.sol";
-import "hardhat/console.sol";
 
 interface IXMCB is IERC20 {
     function rawTotalSupply() external view returns (uint256);
@@ -76,7 +75,7 @@ contract RewardDistribution is Context, Ownable {
     /**
      * @notice  The address of base token.
      */
-    function baseToken() public view returns (address) {
+    function baseToken() external view returns (address) {
         return address(xmcb);
     }
 
@@ -118,7 +117,7 @@ contract RewardDistribution is Context, Ownable {
     /**
      * @notice  Create a new reward plan for given token, setting the reward rate. Duplicated creation will be reverted.
      */
-    function createRewardPlan(address token, uint256 rewardRate) public onlyAuthorized {
+    function createRewardPlan(address token, uint256 rewardRate) external onlyAuthorized {
         require(token != address(0), "invalid reward token");
         require(token.isContract(), "reward token must be contract");
         require(!hasPlan(token), "plan already exists");
@@ -131,7 +130,7 @@ contract RewardDistribution is Context, Ownable {
     /**
      * @notice  Get the reward tokens, including the finished reward plan.
      */
-    function getRewardTokens() public view returns (address[] memory) {
+    function getRewardTokens() external view returns (address[] memory) {
         uint256 tokenCount = _activeReward.length();
         address[] memory results = new address[](tokenCount);
         for (uint256 i = 0; i < tokenCount; i++) {
@@ -143,7 +142,7 @@ contract RewardDistribution is Context, Ownable {
     /**
      * @notice  Get the finished time and reward rate of a reward plan.
      */
-    function getRewardPlan(address token) public view returns (uint256, uint256) {
+    function getRewardPlan(address token) external view returns (uint256, uint256) {
         RewardPlan storage plan = _rewardPlans[token];
         return (plan.periodFinish, plan.rewardRate);
     }
@@ -155,7 +154,7 @@ contract RewardDistribution is Context, Ownable {
      * @param   newRewardRate   New reward distribution rate.
      */
     function setRewardRate(address token, uint256 newRewardRate)
-        public
+        external
         virtual
         onlyAuthorized
         onlyOnExistPlan(token)
@@ -183,7 +182,7 @@ contract RewardDistribution is Context, Ownable {
      * @param   reward  Amount of reward to add.
      */
     function notifyRewardAmount(address token, uint256 reward)
-        public
+        external
         virtual
         onlyAuthorized
         onlyOnExistPlan(token)
@@ -262,7 +261,7 @@ contract RewardDistribution is Context, Ownable {
     /**
      * @notice  Claim remaining reward of all tokens for caller.
      */
-    function getAllRewards() public {
+    function getAllRewards() external {
         uint256 length = _activeReward.length();
         for (uint256 i = 0; i < length; i++) {
             getReward(_activeReward.at(i));

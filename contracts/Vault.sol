@@ -13,8 +13,6 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 
 import "./interfaces/IAuthenticator.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @notice  Vault is a contract to hold various assets from different source.
  */
@@ -23,8 +21,6 @@ contract Vault is Initializable, ERC721HolderUpgradeable, ReentrancyGuardUpgrade
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
-
-    bytes32 public constant VAULT_ADMIN_ROLE = keccak256("VAULT_ADMIN_ROLE");
 
     IAuthenticator public authenticator;
 
@@ -36,10 +32,7 @@ contract Vault is Initializable, ERC721HolderUpgradeable, ReentrancyGuardUpgrade
     receive() external payable {}
 
     modifier onlyAuthorized() {
-        require(
-            authenticator.hasRoleOrAdmin(VAULT_ADMIN_ROLE, msg.sender),
-            "caller is not authorized"
-        );
+        require(authenticator.hasRoleOrAdmin(0, msg.sender), "caller is not authorized");
         _;
     }
 
@@ -64,6 +57,7 @@ contract Vault is Initializable, ERC721HolderUpgradeable, ReentrancyGuardUpgrade
      * @param   value       The amount of asset to send.
      */
     function transferETH(address recipient, uint256 value) external onlyAuthorized nonReentrant {
+        require(recipient != address(0), "recipient is zero address");
         require(value != 0, "transfer value is zero");
         AddressUpgradeable.sendValue(payable(recipient), value);
         emit TransferETH(recipient, value);
@@ -81,6 +75,7 @@ contract Vault is Initializable, ERC721HolderUpgradeable, ReentrancyGuardUpgrade
         address recipient,
         uint256 amount
     ) external onlyAuthorized nonReentrant {
+        require(recipient != address(0), "recipient is zero address");
         require(amount != 0, "transfer amount is zero");
         IERC20Upgradeable(token).safeTransfer(recipient, amount);
         emit TransferERC20Token(token, recipient, amount);
@@ -98,6 +93,7 @@ contract Vault is Initializable, ERC721HolderUpgradeable, ReentrancyGuardUpgrade
         uint256 tokenID,
         address recipient
     ) external onlyAuthorized nonReentrant {
+        require(recipient != address(0), "recipient is zero address");
         IERC721Upgradeable(token).safeTransferFrom(address(this), recipient, tokenID);
         emit TransferERC721Token(token, tokenID, recipient);
     }

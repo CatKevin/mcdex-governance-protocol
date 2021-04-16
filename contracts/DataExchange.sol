@@ -34,7 +34,9 @@ contract DataExchange is Initializable {
     event FeedDataToL1(bytes32 key, bytes data);
     event ReceiveDataFromL2(bytes32 key, bytes data);
 
-    receive() external payable {}
+    receive() external payable {
+        revert("contract doesn't accept ether");
+    }
 
     modifier onlyAuthorized() {
         require(
@@ -76,14 +78,14 @@ contract DataExchange is Initializable {
      * @notice  Retreive data in bytes format for given key. Retreiver need to decode to get the raw data.
      *          For one key, old data will be overriden by newer data.
      */
-    function getData(bytes32 key) public view returns (bytes memory, bool) {
+    function getData(bytes32 key) external view returns (bytes memory, bool) {
         return (dataValues[key], dataUpdateTimestamps[key] > 0);
     }
 
     /**
      * @notice  Retreive the last updated timestamp for given key.
      */
-    function getDataLastUpdateTimestamp(bytes32 key) public view returns (uint256) {
+    function getDataLastUpdateTimestamp(bytes32 key) external view returns (uint256) {
         return dataUpdateTimestamps[key];
     }
 
@@ -288,7 +290,7 @@ contract DataExchange is Initializable {
         return outbox.l2ToL1Sender();
     }
 
-    function _isL2Net() internal view returns (bool) {
+    function _isL2Net() internal pure returns (bool) {
         uint256 id;
         assembly {
             id := chainid()

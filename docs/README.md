@@ -58,12 +58,12 @@ Call these method to retrieve current mintable amount of base part and series-A 
 *Before read the amounts, a update operation will be performed, so the methods are not read-only. Try use staticCall to get the result.*
 
 ```javascript
-function receiveMintRequestFromL2(
+function receiveBaseMintRequestFromL2(
 	uint8 releaseType,
 	address recipient,
 	uint256 amount
 ) public
-function executeMintRequest(
+function executeBaseMintRequest(
 	uint256 index,
     address bridge,
     uint256 maxSubmissionCost,
@@ -72,7 +72,7 @@ function executeMintRequest(
 ) public
 ```
 
-`receiveMintRequestFromL2` receives requests from L2 and can be executed through `executeMintRequest`.
+`receiveBaseMintRequestFromL2` receives requests from L2 and can be executed through `executeBaseMintRequest`.
 
 The usage of auguments `bridge`, `maxSubmissionCost`, `maxGas` and `gasPriceBid` can be found in  [Arbitrum](https://developer.offchainlabs.com/docs/developer_quickstart).
 

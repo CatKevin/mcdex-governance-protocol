@@ -22,14 +22,14 @@ contract BalanceBroadcaster is Initializable {
     /**
      * @notice  Return the count of registered components.
      */
-    function componentCount() public view returns (uint256) {
+    function componentCount() external view returns (uint256) {
         return _components.length();
     }
 
     /**
      * @notice  Check if a address is a registered component in broadcaster.
      */
-    function isComponent(address component) public view returns (bool) {
+    function isComponent(address component) external view returns (bool) {
         return _components.contains(component);
     }
 
