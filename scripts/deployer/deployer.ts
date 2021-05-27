@@ -38,13 +38,13 @@ export class Deployer {
         this.linkReferences = await retrieveLinkReferences(this.options.artifactDirectory)
         this.load()
         for (var contractName in this.options.addressOverride) {
-            if (contractName in this.deployedContracts) {
-                this.deployedContracts[contractName] = {
-                    type: "preset",
-                    name: contractName,
-                    address: this.options.addressOverride[contractName],
-                }
+            // if (contractName in this.deployedContracts) {
+            this.deployedContracts[contractName] = {
+                type: "preset",
+                name: contractName,
+                address: this.options.addressOverride[contractName],
             }
+            // }
         }
     }
 

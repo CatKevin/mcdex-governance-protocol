@@ -26,13 +26,13 @@ interface IBridge {
 
 interface IRollup {
     // Bridge is an IInbox and IOutbox
-    function bridge() external view returns (address);
+    function delayedBridge() external view returns (address);
 
     function outbox() external view returns (address);
 }
 
 interface IL2ERC20Bridge {
-    function depositAsERC20(
+    function deposit(
         address erc20,
         address destination,
         uint256 amount,

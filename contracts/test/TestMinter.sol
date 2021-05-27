@@ -13,6 +13,7 @@ contract TestMinter is Minter {
     uint256 internal _mockBlockNumber;
 
     constructor(
+        address mintInitiator_,
         address mcbToken_,
         address valueCapture_,
         address seriesA_,
@@ -23,6 +24,7 @@ contract TestMinter is Minter {
         uint256 seriesAMaxReleaseRate_
     )
         Minter(
+            mintInitiator_,
             mcbToken_,
             valueCapture_,
             seriesA_,

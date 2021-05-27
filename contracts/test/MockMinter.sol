@@ -7,13 +7,13 @@ import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import "./interfaces/IL2ArbNetwork.sol";
-import "./interfaces/IDataExchange.sol";
-import "./interfaces/IValueCapture.sol";
-import "./interfaces/IMCB.sol";
-import "./Environment.sol";
+import "../interfaces/IL2ArbNetwork.sol";
+import "../interfaces/IDataExchange.sol";
+import "../interfaces/IValueCapture.sol";
+import "../interfaces/IMCB.sol";
+import "../Environment.sol";
 
-contract Minter is ReentrancyGuard, Environment {
+contract MockMinter is ReentrancyGuard, Environment {
     using Address for address;
     using Math for uint256;
     using SafeMath for uint256;
@@ -205,13 +205,6 @@ contract Minter is ReentrancyGuard, Environment {
     }
 
     /**
-     * @notice   Return length of mint request queue.
-     */
-    function getMintRequestCount() public view returns (uint256) {
-        return mintRequests.length;
-    }
-
-    /**
      * @notice   Execute a minting request, mint token to different recipient according to the `mintType`.
      */
     function executeBaseMintRequest(
@@ -252,7 +245,7 @@ contract Minter is ReentrancyGuard, Environment {
         }
         baseMintedAmount = baseMintedAmount.add(request.amount);
         request.executed = true;
-        _syncTotalSupply(IL2ERC20Bridge(bridge).inbox(), maxGas, gasPriceBid);
+        _syncTotalSupply(bridge, maxGas, gasPriceBid);
 
         emit ExecuteMintRequest(index, request.releaseType, request.recipient, request.amount);
     }
@@ -297,24 +290,12 @@ contract Minter is ReentrancyGuard, Environment {
     function _mintToL2(
         address recipient,
         uint256 amount,
-        address bridge,
-        uint256 maxSubmissionCost,
-        uint256 maxGas,
-        uint256 gasPriceBid
+        address,
+        uint256,
+        uint256,
+        uint256
     ) internal returns (uint256, uint256) {
-        IL2ERC20Bridge erc20Bridge = IL2ERC20Bridge(bridge);
-        require(_isValidInbox(erc20Bridge.inbox()), "inbox is invalid");
-        (uint256 toDevAmount, uint256 toRecipientAmount) = _mintToL1(address(this), amount);
-        mcbToken.approve(bridge, toRecipientAmount);
-        erc20Bridge.deposit(
-            address(mcbToken),
-            recipient,
-            toRecipientAmount,
-            maxSubmissionCost,
-            maxGas,
-            gasPriceBid,
-            ""
-        );
+        (uint256 toDevAmount, uint256 toRecipientAmount) = _mintToL1(recipient, amount);
         emit MintToL2(recipient, toRecipientAmount, devAccount, toDevAmount);
         return (toDevAmount, toRecipientAmount);
     }
@@ -332,7 +313,7 @@ contract Minter is ReentrancyGuard, Environment {
         uint256 maxGas,
         uint256 gasPriceBid
     ) internal returns (bool) {
-        require(_isValidInbox(inbox), "inbox is invalid");
+        // require(_isValidInbox(inbox), "inbox is invalid");
         return
             dataExchange.tryFeedDataFromL1(
                 MCB_TOTAL_SUPPLY_KEY,
@@ -344,15 +325,11 @@ contract Minter is ReentrancyGuard, Environment {
     }
 
     function _isValidInbox(address inbox) internal view returns (bool) {
-        IBridge trustedBridge = IBridge(IRollup(ROLLUP_ADDRESS).delayedBridge());
-        return trustedBridge.allowedInboxes(inbox);
+        return true;
     }
 
-    function _getL2Sender(address bridge) internal view returns (address) {
-        address trustedBridge = IRollup(ROLLUP_ADDRESS).delayedBridge();
-        require(trustedBridge == bridge, "not a valid l2 outbox");
-        IOutbox outbox = IOutbox(IBridge(trustedBridge).activeOutbox());
-        return outbox.l2ToL1Sender();
+    function _getL2Sender(address) internal view returns (address) {
+        return msg.sender;
     }
 
     function _updateBaseMintableAmount() internal {

@@ -7,7 +7,7 @@ import "hardhat-contract-sizer";
 // import "hardhat-abi-exporter";
 import "solidity-coverage"
 
-import { checkAuth, updateDataSource } from './scripts/dataExchangeTools'
+import { checkAuth, updateDataSource, showDetails, pushToL2, pushToL1 } from './scripts/dataExchangeTools'
 
 task("accounts", "Prints the list of accounts", async (args, hre) => {
     const accounts = await hre.ethers.getSigners();
@@ -103,7 +103,6 @@ task("checkAuth", "CONTRACT_CALL")
         await checkAuth(hre, args.key, args.account)
     })
 
-
 task("updateDataSource", "CONTRACT_CALL")
     .addOptionalPositionalParam("key", "bytes32")
     .addOptionalPositionalParam("account", "address")
@@ -111,12 +110,30 @@ task("updateDataSource", "CONTRACT_CALL")
         await updateDataSource(hre, hre.ethers.utils.id(args.key), args.account)
     })
 
-// task("updateDataSource", "CONTRACT_CALL")
-//     .addOptionalPositionalParam("key", "bytes32")
-//     .addOptionalPositionalParam("account", "address")
-//     .setAction(async (args, hre) => {
-//         await updateDataSource(hre, hre.ethers.utils.id(args.key), args.account)
-//     })
+task("pushToL2", "CONTRACT_CALL")
+    .addOptionalPositionalParam("key", "bytes32")
+    .addOptionalPositionalParam("value", "bytes32")
+    .setAction(async (args, hre) => {
+        await pushToL2(
+            hre,
+            hre.ethers.utils.id(args.key),
+            hre.ethers.utils.defaultAbiCoder.encode(["bytes"], [args.value]))
+    })
+
+task("pushToL1", "CONTRACT_CALL")
+    .addOptionalPositionalParam("key", "bytes32")
+    .addOptionalPositionalParam("value", "bytes32")
+    .setAction(async (args, hre) => {
+        await pushToL1(
+            hre,
+            hre.ethers.utils.id(args.key),
+            hre.ethers.utils.solidityPack(["bytes"], [hre.ethers.utils.hexValue(Number(args.value))]))
+    })
+
+task("showDetails", "CONTRACT_CALL")
+    .setAction(async (args, hre) => {
+        await showDetails(hre)
+    })
 
 
 
@@ -127,20 +144,12 @@ module.exports = {
         hardhat: {
             // loggingEnabled: true
         },
-        tc: {
-            url: "http://10.30.204.119:8547",
-            gasPrice: 0,
+        arb5: {
+            url: "https://kovan5.arbitrum.io/rpc",
+            gasPrice: 6e8,
+            blockGasLimit: "80000000",
             accounts: ["b49bdc31d49ece2ee667de5c0b378ce193af4153c554db624db71696911ac6c6"],
-            timeout: 300000,
-            confirmations: 10,
-            l1URL: "http://10.30.204.119:7545",
-        },
-        arbtest: {
-            url: "http://10.30.204.119:8547",
-            gasPrice: 1e9,
-            accounts: ["dc1dfb1ba0850f1e808eb53e4c83f6a340cc7545e044f0a0f88c0e38dd3fa40d"],
-            timeout: 300000,
-            confirmations: 10,
+            urlL1: "https://kovan.infura.io/v3/3582010d3cc14ab183653e5861d0c118",
         },
         s10: {
             url: "http://server10.jy.mcarlo.com:8747",

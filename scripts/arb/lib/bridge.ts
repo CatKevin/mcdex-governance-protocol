@@ -29,6 +29,7 @@ const { Zero } = constants
 export class Bridge extends L2Bridge {
     l1Bridge: L1Bridge
     walletAddressCache?: string
+    address: string
 
     constructor(
         erc20BridgeAddress: string,
@@ -37,6 +38,7 @@ export class Bridge extends L2Bridge {
         arbSigner: Signer
     ) {
         super(arbERC20BridgeAddress, arbSigner)
+        this.address = arbERC20BridgeAddress
 
         this.l1Bridge = new L1Bridge(erc20BridgeAddress, ethSigner)
     }
@@ -211,7 +213,8 @@ export class Bridge extends L2Bridge {
     public async triggerL2ToL1Transaction(
         batchNumber: BigNumber,
         indexInBatch: BigNumber,
-        singleAttempt = false
+        singleAttempt = false,
+        waitForOutbox = false
     ) {
         const inbox = await this.l1Bridge.getInbox()
         const bridgeAddress = await inbox.bridge()
@@ -222,7 +225,8 @@ export class Bridge extends L2Bridge {
             bridgeAddress,
             this.l2Provider,
             this.l1Bridge.l1Signer,
-            singleAttempt
+            singleAttempt,
+            waitForOutbox
         )
     }
 

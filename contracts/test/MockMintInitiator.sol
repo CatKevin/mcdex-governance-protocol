@@ -7,16 +7,16 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
-import "./interfaces/IL2ArbNetwork.sol";
-import "./interfaces/IDataExchange.sol";
-import "./interfaces/IAuthenticator.sol";
-import "./Environment.sol";
+import "../interfaces/IL2ArbNetwork.sol";
+import "../interfaces/IDataExchange.sol";
+import "../interfaces/IAuthenticator.sol";
+import "../Environment.sol";
 
 /**
  * @notice  MintInitiator is used to send mint request submitted from DAO from L2 to L1.
  * @dev     MintInitiator will be deployed on L2.
  */
-contract MintInitiator is Initializable, Environment {
+contract MockMintInitiator is Initializable, Environment {
     using AddressUpgradeable for address;
 
     IAuthenticator public authenticator;
@@ -62,8 +62,7 @@ contract MintInitiator is Initializable, Environment {
         address recipient,
         uint256 amount
     ) external onlyAuthorized {
-        IArbSys(ARB_SYS_ADDRESS).sendTxToL1(
-            getL1Minter(),
+        _l1Minter.functionCall(
             abi.encodeWithSignature(
                 "receiveBaseMintRequestFromL2(uint8,address,uint256)",
                 releaseType,

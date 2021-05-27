@@ -12,77 +12,31 @@ const ENV: DeploymentOptions = {
     network: hre.network.name,
     artifactDirectory: './artifacts/contracts',
     addressOverride: {
-        WETH9: "0xd0A1E359811322d97991E03f863a0C30C2cF029C",
+
     }
 }
 
-async function deployDataExchange(deployer, authenticator) {
-    const l1Provider = new ethers.providers.JsonRpcProvider("http://10.30.204.119:7545")
-    const l2Provider = new ethers.providers.JsonRpcProvider("http://10.30.204.119:8547")
-
-    let privateKey = ethers.utils.randomBytes(32)
-    let l1Wallet = new ethers.Wallet(privateKey, l1Provider)
-    let l2Wallet = new ethers.Wallet(privateKey, l2Provider)
-
-    // send deployment funds
-    const ownerWallet = hre.ethers.provider.getSigner(0);
-    const feeTx = await ensureFinished(hre.ethers.provider.getSigner(0).sendTransaction({
-        to: l1Wallet.address,
-        value: toWei("0.1"),
-        gasLimit: 25000,
-    }))
-    let l1Deployed
-    let l2Deployed
-    try {
-        l1Deployed = await deployer.deployWith(l1Wallet, "DataExchange")
-        l2Deployed = await deployer.deployWith(l2Wallet, "DataExchange")
-        await ensureFinished(l1Deployed.initialize(authenticator.address))
-        await ensureFinished(l2Deployed.initialize(authenticator.address))
-        return { l1DataExchange: l1Deployed, l2DataExchange: l2Deployed }
-    } catch (err) {
-        printError(err)
-        throw err
-    } finally {
-        // refund deployment funds
-        let refund = await l1Wallet.getBalance()
-        printInfo(`${refund} left`)
-        const transferCost = ethers.BigNumber.from(feeTx.gasPrice).mul(ethers.BigNumber.from(25000))
-        // printInfo(`${transferCost} for transfer fee`)
-        if (refund.gt(transferCost)) {
-            refund = refund.sub(transferCost)
-            printInfo(`refund ${refund} to ${await ownerWallet.getAddress()}`);
-            await l1Wallet.sendTransaction({
-                to: await ownerWallet.getAddress(),
-                value: refund,
-                gasLimit: 25000,
-                gasPrice: feeTx.gasPrice,
-            })
-
-        }
-    }
-}
-
+// onL1
 async function main(deployer, accounts) {
-    await hre.run("compile");
-
     const owner = accounts[0]
+
     // authenticator
     printInfo("creating Authenticator ...")
     const authenticator = await deployer.deploy("Authenticator")
     await ensureFinished(authenticator.initialize());
     printInfo("done")
 
-    // data exchange
-    printInfo("creating DataExchange ...")
-    await deployDataExchange(deployer, authenticator);
-    printInfo("done")
-
     // fake mcb
+    // const l1Provider = new ethers.providers.JsonRpcProvider(hre.network.config.urlL1)
+    // const l1Wallet = new ethers.Wallet(hre.network.config.accounts[0], l1Provider)
     printInfo("creating Test MCB ...")
-    const mcb = await deployer.deployAs("CustomERC20", "MCB", "MCB", "MCB", 18);
+    const mcb = await deployer.deploy("MCB", "fakeMCB", "fakeMCB", 18);
     printInfo("done")
 
-    // xmcb
+    printInfo("creating dataExchange ...")
+    const dataExchange = await deployer.deploy("MockDataExchange")
+    printInfo("done")
+
     printInfo("creating XMCB ...")
     const xmcb = await deployer.deploy("XMCB");
     await ensureFinished(xmcb.initialize(
@@ -92,19 +46,20 @@ async function main(deployer, accounts) {
     ))
     printInfo("done")
 
-    // timelock & governor
     printInfo("creating Voting System ...")
+    console.log(owner.address)
     const timelock = await deployer.deploy("Timelock", owner.address, 0);
     const governor = await deployer.deploy(
         "FastGovernorAlpha",
-        deployer.addressOf("DataExchange"),
+        deployer.addressOf("MockDataExchange"),
         deployer.addressOf("Timelock"),
         deployer.addressOf("XMCB"),
-        owner.address
+        owner.address,
+        22
     );
-
     // set admin to governor && restore delay
-    const eta = (await ethers.provider.getBlock()).timestamp + 10;
+    // const eta = (await ethers.provider.getBlock()).timestamp + 10;
+    const eta = Math.floor(Date.now() / 1000)
     await ensureFinished(timelock.queueTransaction(
         timelock.address,
         0,
@@ -119,8 +74,7 @@ async function main(deployer, accounts) {
         ethers.utils.defaultAbiCoder.encode(["uint256"], [300]),
         eta
     ))
-    await sleep(10000)
-
+    await sleep(20000)
     await ensureFinished(timelock.executeTransaction(
         timelock.address,
         0,
@@ -148,8 +102,8 @@ async function main(deployer, accounts) {
     // value capture
     printInfo("creating Vault Capture ...")
     const valueCapture = await deployer.deploy("ValueCapture");
-    await ensureFinished(valueCapture.initialize(authenticator.address, deployer.addressOf("DataExchange"), vault.address));
-    await ensureFinished(authenticator.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", timelock.address));
+    await ensureFinished(valueCapture.initialize(authenticator.address, deployer.addressOf("MockDataExchange"), vault.address));
+    await ensureFinished(authenticator.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", deployer.addressOf("Timelock")));
     printInfo("done")
 
     // test in & out
@@ -170,21 +124,25 @@ async function main(deployer, accounts) {
     printInfo("creating Reward Distribution ...")
     const rewardDistrubution = await deployer.deploy("TestRewardDistribution", authenticator.address, xmcb.address);
     await ensureFinished(xmcb.addComponent(rewardDistrubution.address));
-    await ensureFinished(rewardDistrubution.createRewardPlan(mcb.address, toWei("0.2")))
-    await ensureFinished(rewardDistrubution.notifyRewardAmount(mcb.address, toWei("20000")))
+    await ensureFinished(rewardDistrubution.createRewardPlan(deployer.addressOf("MCB"), toWei("0.2")))
+    await ensureFinished(rewardDistrubution.notifyRewardAmount(deployer.addressOf("MCB"), toWei("20000")))
     printInfo("done")
 
     printInfo("creating Minter ...")
-    await deployer.deploy("Minter",
-        mcb.address,
-        deployer.addressOf("DataExchange"),
+    const mintInitiator = await deployer.deploy("MockMintInitiator")
+    await deployer.deploy(
+        "MockMinter",
+        deployer.addressOf("MockMintInitiator"),
+        deployer.addressOf("MCB"),
+        deployer.addressOf("MockDataExchange"),
         owner.address,
         owner.address,
-        toWei("5000000"),
-        toWei("5000000"),
+        toWei("4000000"),
+        toWei("4000000"),
         toWei("0.2"),
         toWei("0.55392"),
     )
+    await mintInitiator.initialize(deployer.addressOf("Authenticator"), deployer.addressOf("MockMinter"))
     printInfo("done")
 }
 

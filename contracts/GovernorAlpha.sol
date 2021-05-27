@@ -7,8 +7,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "./interfaces/IDataExchange.sol";
 
 contract GovernorAlpha {
-    address public constant DATA_EXCHANGE_ADDRESS = 0x0000000000000000000000000000000000000000;
-    bytes32 public constant MCB_TOTAL_SUPPLY = keccak256("MCB_TOTAL_SUPPLY");
+    bytes32 public constant MCB_TOTAL_SUPPLY_KEY = keccak256("MCB_TOTAL_SUPPLY_KEY");
 
     /// @notice The name of this contract
     string public constant name = "MCDEX DAO Governor Alpha";
@@ -51,9 +50,6 @@ contract GovernorAlpha {
 
     /// @notice The address of the Governor Guardian
     address public guardian;
-
-    /// @notice The total number of proposals
-    uint256 public proposalCount;
 
     struct Proposal {
         // Unique id for looking up a proposal
@@ -114,6 +110,12 @@ contract GovernorAlpha {
     /// @notice The EIP-712 typehash for the ballot struct used by the contract
     bytes32 public constant BALLOT_TYPEHASH = keccak256("Ballot(uint256 proposalId,bool support)");
 
+    /// @notice The initial id of proposal
+    uint256 public initialProposalId;
+
+    /// @notice The total number of proposals
+    uint256 public proposalCount;
+
     /// @notice An event emitted when a new proposal is created
     event ProposalCreated(
         uint256 id,
@@ -144,12 +146,14 @@ contract GovernorAlpha {
         address dataExchange_,
         address timelock_,
         address comp_,
-        address guardian_
+        address guardian_,
+        uint256 initialProposalId_
     ) {
         dataExchange = IDataExchange(dataExchange_);
         timelock = TimelockInterface(timelock_);
         comp = CompInterface(comp_);
         guardian = guardian_;
+        initialProposalId = initialProposalId_;
     }
 
     function propose(
@@ -191,8 +195,8 @@ contract GovernorAlpha {
         uint256 startBlock = _add256(_getBlockNumber(), votingDelay());
         uint256 endBlock = _add256(startBlock, votingPeriod());
 
+        uint256 proposalId = proposalCount + initialProposalId;
         proposalCount++;
-        uint256 proposalId = proposalCount;
 
         proposals[proposalId].id = proposalId;
         proposals[proposalId].proposer = msg.sender;
@@ -324,7 +328,7 @@ contract GovernorAlpha {
 
     function state(uint256 proposalId) public view returns (ProposalState) {
         require(
-            proposalCount >= proposalId && proposalId > 0,
+            proposalId < proposalCount + initialProposalId && proposalId >= initialProposalId,
             "GovernorAlpha::state: invalid proposal id"
         );
         Proposal storage proposal = proposals[proposalId];
@@ -467,7 +471,7 @@ contract GovernorAlpha {
     }
 
     function _getMCBTotalSupply() internal view virtual returns (uint256) {
-        (bytes memory data, bool exist) = dataExchange.getData(MCB_TOTAL_SUPPLY);
+        (bytes memory data, bool exist) = dataExchange.getData(MCB_TOTAL_SUPPLY_KEY);
         require(exist, "no total supply data feeded");
         return abi.decode(data, (uint256));
     }

@@ -13,7 +13,7 @@ contract TestDataExchange is Initializable {
 
     bytes32 public constant DATA_EXCHANGE_ADMIN_ROLE = keccak256("DATA_EXCHANGE_ADMIN_ROLE");
     address public constant ARB_SYS_ADDRESS = 0x0000000000000000000000000000000000000064;
-    address public constant ROLLUP_ADDRESS = 0x19914a2873136aE17E25E4eff6088BF17f3ea3a3;
+    address public constant ROLLUP_ADDRESS = 0x2B0474e5201646fd7d8eEf8522a88376940B1db0;
     uint256 public constant CHAINID_MASK =
         0x0000000000000000000000000000000000000000000000000000FFFFFFFFFFFF;
 
@@ -271,7 +271,7 @@ contract TestDataExchange is Initializable {
     }
 
     function _isValidInbox(address inbox) internal view returns (bool) {
-        try IRollup(ROLLUP_ADDRESS).bridge() returns (address trustedBridge) {
+        try IRollup(ROLLUP_ADDRESS).delayedBridge() returns (address trustedBridge) {
             return IBridge(trustedBridge).allowedInboxes(inbox);
         } catch {
             return false;
@@ -279,7 +279,7 @@ contract TestDataExchange is Initializable {
     }
 
     function _getL2Sender(address bridge) internal view returns (address) {
-        address trustedBridge = IRollup(ROLLUP_ADDRESS).bridge();
+        address trustedBridge = IRollup(ROLLUP_ADDRESS).delayedBridge();
         require(trustedBridge == bridge, "not a valid l2 outbox");
         IOutbox outbox = IOutbox(IBridge(trustedBridge).activeOutbox());
         return outbox.l2ToL1Sender();

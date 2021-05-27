@@ -14,7 +14,7 @@ contract TestGovernorAlpha is GovernorAlpha {
         address timelock_,
         address comp_,
         address guardian_
-    ) GovernorAlpha(0x0000000000000000000000000000000000000000, timelock_, comp_, guardian_) {
+    ) GovernorAlpha(0x0000000000000000000000000000000000000000, timelock_, comp_, guardian_, 1) {
         mockMCB = mcb_;
     }
 
