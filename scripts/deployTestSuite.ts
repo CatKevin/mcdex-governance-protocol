@@ -57,42 +57,6 @@ async function main(deployer, accounts) {
         owner.address,
         22
     );
-    // set admin to governor && restore delay
-    // const eta = (await ethers.provider.getBlock()).timestamp + 10;
-    const eta = Math.floor(Date.now() / 1000)
-    await ensureFinished(timelock.queueTransaction(
-        timelock.address,
-        0,
-        "setPendingAdmin(address)",
-        ethers.utils.defaultAbiCoder.encode(["address"], [governor.address]),
-        eta
-    ))
-    await ensureFinished(timelock.queueTransaction(
-        timelock.address,
-        0,
-        "setDelay(uint256)",
-        ethers.utils.defaultAbiCoder.encode(["uint256"], [300]),
-        eta
-    ))
-    await sleep(20000)
-    await ensureFinished(timelock.executeTransaction(
-        timelock.address,
-        0,
-        "setPendingAdmin(address)",
-        ethers.utils.defaultAbiCoder.encode(["address"], [governor.address]),
-        eta
-    ))
-    await ensureFinished(timelock.executeTransaction(
-        timelock.address,
-        0,
-        "setDelay(uint256)",
-        ethers.utils.defaultAbiCoder.encode(["uint256"], [300]),
-        eta
-    ))
-
-    await ensureFinished(governor.__acceptAdmin())
-    printInfo("done")
-
     // vault
     printInfo("creating Vault ...")
     const vault = await deployer.deploy("Vault");
