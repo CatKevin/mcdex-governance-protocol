@@ -12,26 +12,14 @@ interface IBridge {
     function activeOutbox() external view returns (address);
 
     function allowedInboxes(address inbox) external view returns (bool);
-
-    function allowedOutboxes(address outbox) external view returns (bool);
-
-    function allowedInboxList(uint256 index) external view returns (address);
-
-    function allowedOutboxList(uint256 index) external view returns (address);
-
-    function inboxAccs(uint256 index) external view returns (bytes32);
-
-    function messageCount() external view returns (uint256);
 }
 
 interface IRollup {
     // Bridge is an IInbox and IOutbox
     function delayedBridge() external view returns (address);
-
-    function outbox() external view returns (address);
 }
 
-interface IL2ERC20Bridge {
+interface IEthERC20Bridge {
     function deposit(
         address erc20,
         address destination,
@@ -40,26 +28,16 @@ interface IL2ERC20Bridge {
         uint256 maxGas,
         uint256 gasPriceBid,
         bytes calldata callHookData
-    ) external payable returns (uint256);
+    ) external payable returns (uint256 seqNum, uint256 depositCalldataLength);
 
     function inbox() external view returns (address);
 }
 
 interface IOutbox {
     function l2ToL1Sender() external view returns (address);
-
-    function processOutgoingMessages(bytes calldata sendsData, uint256[] calldata sendLengths)
-        external;
 }
 
 interface IInbox {
-    function sendL1FundedContractTransaction(
-        uint256 maxGas,
-        uint256 gasPriceBid,
-        address destAddr,
-        bytes calldata data
-    ) external payable returns (uint256);
-
     function sendContractTransaction(
         uint256 maxGas,
         uint256 gasPriceBid,

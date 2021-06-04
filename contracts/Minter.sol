@@ -252,7 +252,7 @@ contract Minter is ReentrancyGuard, Environment {
         }
         baseMintedAmount = baseMintedAmount.add(request.amount);
         request.executed = true;
-        _syncTotalSupply(IL2ERC20Bridge(bridge).inbox(), maxGas, gasPriceBid);
+        _syncTotalSupply(IEthERC20Bridge(bridge).inbox(), maxGas, gasPriceBid);
 
         emit ExecuteMintRequest(index, request.releaseType, request.recipient, request.amount);
     }
@@ -296,7 +296,7 @@ contract Minter is ReentrancyGuard, Environment {
         uint256 maxGas,
         uint256 gasPriceBid
     ) internal returns (uint256, uint256) {
-        IL2ERC20Bridge erc20Bridge = IL2ERC20Bridge(bridge);
+        IEthERC20Bridge erc20Bridge = IEthERC20Bridge(bridge);
         require(_isValidInbox(erc20Bridge.inbox()), "inbox is invalid");
         (uint256 toDevAmount, uint256 toRecipientAmount) = _mintToL1(address(this), amount);
         mcbToken.approve(bridge, toRecipientAmount);

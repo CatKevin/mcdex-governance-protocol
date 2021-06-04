@@ -16,8 +16,7 @@ contract DataExchange is Initializable, Environment {
     using AddressUpgradeable for address;
 
     bytes32 public constant DATA_EXCHANGE_ADMIN_ROLE = keccak256("DATA_EXCHANGE_ADMIN_ROLE");
-    uint256 public constant CHAINID_MASK =
-        0x0000000000000000000000000000000000000000000000000000FFFFFFFFFFFF;
+    uint256 public constant L2_CHAINID = 0xA4b1; // Arbitrum One
 
     IAuthenticator public authenticator;
 
@@ -301,7 +300,7 @@ contract DataExchange is Initializable, Environment {
         assembly {
             id := chainid()
         }
-        return id == (uint256(ROLLUP_ADDRESS) & CHAINID_MASK);
+        return id == L2_CHAINID;
     }
 
     function _getBlockTimestamp() internal view virtual returns (uint256) {
