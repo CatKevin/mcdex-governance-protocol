@@ -31,7 +31,7 @@ contract Minter is ReentrancyGuard, Environment {
     }
 
     address public devAccount;
-    address public l2SeriesAVesting;
+    address public l1SeriesAVesting;
 
     uint256 public totalCapturedValue;
     uint256 public extraMintableAmount;
@@ -99,7 +99,7 @@ contract Minter is ReentrancyGuard, Environment {
         mintInitiator = mintInitiator_;
         mcbToken = IMCB(mcbToken_);
         dataExchange = IDataExchange(dataExchange_);
-        l2SeriesAVesting = l2SeriesAVesting_;
+        l1SeriesAVesting = l2SeriesAVesting_;
         devAccount = devAccount_;
 
         require(
@@ -260,19 +260,13 @@ contract Minter is ReentrancyGuard, Environment {
     /**
      * @notice  Mint MCB to series-A recipient. Can be called by any one.
      */
-    function seriesAMint(
-        uint256 amount,
-        address bridge,
-        uint256 maxSubmissionCost,
-        uint256 maxGas,
-        uint256 gasPriceBid
-    ) external nonReentrant {
+    function seriesAMint(uint256 amount) external nonReentrant {
         require(amount <= seriesAMintableAmount, "amount exceeds max mintable amount");
         require(
             seriesAMintedAmount.add(amount) <= seriesAMaxSupply,
             "minted amount exceeds max series-a supply"
         );
-        _mintToL2(l2SeriesAVesting, amount, bridge, maxSubmissionCost, maxGas, gasPriceBid);
+        _mintToL1(l1SeriesAVesting, amount);
         seriesAMintableAmount = seriesAMintableAmount.sub(amount);
         seriesAMintedAmount = seriesAMintedAmount.add(amount);
     }

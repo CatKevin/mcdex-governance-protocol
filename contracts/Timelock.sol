@@ -2,8 +2,10 @@
 pragma solidity 0.7.4;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 contract Timelock {
+    using Address for address;
     using SafeMath for uint256;
 
     event NewAdmin(address indexed newAdmin);
@@ -128,21 +130,14 @@ contract Timelock {
         require(getBlockTimestamp() <= eta.add(GRACE_PERIOD), "Transaction is stale.");
 
         queuedTransactions[txHash] = false;
-
         bytes memory callData;
-
         if (bytes(signature).length == 0) {
             callData = data;
         } else {
             callData = abi.encodePacked(bytes4(keccak256(bytes(signature))), data);
         }
-
-        // solium-disable-next-line security/no-call-value
-        (bool success, bytes memory returnData) = target.call{ value: value }(callData);
-        require(success, "Transaction execution reverted.");
-
+        bytes memory returnData = target.functionCallWithValue(callData, value);
         emit ExecuteTransaction(txHash, target, value, signature, data, eta);
-
         return returnData;
     }
 

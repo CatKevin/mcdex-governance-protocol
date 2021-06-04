@@ -21,11 +21,11 @@ contract DataExchange is Initializable, Environment {
 
     IAuthenticator public authenticator;
 
-    mapping(bytes32 => address) public dataSources;
+    mapping(bytes32 => bytes32) public dataSources;
     mapping(bytes32 => bytes) public dataValues;
     mapping(bytes32 => uint256) public dataUpdateTimestamps;
 
-    event UpdateDataSource(bytes32 key, address source);
+    event UpdateDataSource(bytes32 key, address source, bool isL2);
 
     event FeedDataToL2(bytes32 key, bytes data, address inbox, uint256 maxGas, uint256 gasPriceBid);
     event ReceiveDataFromL1(bytes32 key, bytes data);
@@ -70,7 +70,9 @@ contract DataExchange is Initializable, Environment {
      * @notice  Check if is a account is authorized to push data for given key.
      */
     function isValidSource(bytes32 key, address account) public view returns (bool) {
-        return account == dataSources[key];
+        bool isCurrentL2 = _isL2Net();
+        (address source, bool isL2) = _decode(dataSources[key]);
+        return account == source && isCurrentL2 == isL2;
     }
 
     /**
@@ -93,14 +95,19 @@ contract DataExchange is Initializable, Environment {
      *          That means the whitelist will be stored in both L1 & L2 storage.
      * @dev     L2 only.
      */
-    function updateDataSource(bytes32 key, address source) external onlyL2 onlyAuthorized {
+    function updateDataSource(
+        bytes32 key,
+        address source,
+        bool isL2
+    ) external onlyL2 onlyAuthorized {
         // require(dataSources[key] != source, "data source is already exist");
-        dataSources[key] = source;
+        bytes32 sourceData = _encode(source, isL2);
+        dataSources[key] = sourceData;
         IArbSys(ARB_SYS_ADDRESS).sendTxToL1(
             address(this),
-            abi.encodeWithSignature("syncDataSourceFromL2(bytes32,address)", key, source)
+            abi.encodeWithSignature("syncDataSourceFromL2(bytes32,bytes32)", key, sourceData)
         );
-        emit UpdateDataSource(key, source);
+        emit UpdateDataSource(key, source, isL2);
     }
 
     /**
@@ -108,11 +115,11 @@ contract DataExchange is Initializable, Environment {
      *          When the source is set in L2, a sync message will be sent to L1 at the same time.
      * @dev     L1 only.
      */
-    function syncDataSourceFromL2(bytes32 key, address source) external onlyL1 {
+    function syncDataSourceFromL2(bytes32 key, bytes32 sourceData) external onlyL1 {
         require(_getL2Sender(msg.sender) == address(this), "sender is invalid");
-        require(dataSources[key] != source, "data source is already exist");
-        dataSources[key] = source;
-        emit UpdateDataSource(key, source);
+        (address source, bool isL2) = _decode(sourceData);
+        dataSources[key] = sourceData;
+        emit UpdateDataSource(key, source, isL2);
     }
 
     /**
@@ -172,7 +179,7 @@ contract DataExchange is Initializable, Environment {
      * @dev     L2 only.
      */
     function feedDataFromL2(bytes32 key, bytes memory data) external onlyL2 {
-        require(dataSources[key] == msg.sender, "data source is invalid");
+        require(isValidSource(key, msg.sender), "data source is invalid");
         _feedDataFromL2(key, data, true);
     }
 
@@ -299,6 +306,19 @@ contract DataExchange is Initializable, Environment {
 
     function _getBlockTimestamp() internal view virtual returns (uint256) {
         return block.timestamp;
+    }
+
+    function _encode(address source, bool isL2) internal pure returns (bytes32 data) {
+        // 32 = | 20 source | 1 isL2 | 11 |
+        uint256 p1 = uint160(bytes20(source));
+        uint256 p2 = uint8(isL2 ? 1 : 0);
+        data = bytes32((p1 << 96) | (p2 << 88));
+    }
+
+    function _decode(bytes32 data) internal pure returns (address source, bool isL2) {
+        // 32 = | 20 source | 1 isL2 | 11 |
+        source = address(bytes20(data));
+        isL2 = uint8(bytes1(data << 160)) > 0;
     }
 
     bytes32[50] private __gap;
