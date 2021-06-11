@@ -13,6 +13,8 @@ import "./interfaces/IValueCapture.sol";
 import "./interfaces/IMCB.sol";
 import "./Environment.sol";
 
+import "hardhat/console.sol";
+
 contract Minter is ReentrancyGuard, Environment {
     using Address for address;
     using Math for uint256;
@@ -55,6 +57,24 @@ contract Minter is ReentrancyGuard, Environment {
     IDataExchange public dataExchange;
     MintRequest[] public mintRequests;
 
+    event UpdateExtraMintableAmount(
+        uint256 lastCapturedBlock,
+        uint256 capturedBlock,
+        uint256 capturedValue,
+        uint256 extraMintableAmount
+    );
+    event UpdateSeriesAMintableAmount(
+        uint256 lastUpdateBlock,
+        uint256 currentBlock,
+        uint256 seriesAMintableAmount,
+        uint256 extraMintableAmount
+    );
+    event UpdateBaseMintableAmount(
+        uint256 lastUpdateBlock,
+        uint256 currentBlock,
+        uint256 baseMintableAmount
+    );
+
     event MintToL1(
         address indexed recipient,
         uint256 recipientReceivedAmount,
@@ -67,7 +87,6 @@ contract Minter is ReentrancyGuard, Environment {
         address indexed devAccount,
         uint256 devReceivedAmount
     );
-
     event SetDevAccount(address indexed devOld, address indexed devNew);
     event ReceiveMintRequest(
         uint256 index,
@@ -91,7 +110,8 @@ contract Minter is ReentrancyGuard, Environment {
         uint256 baseMaxSupply_,
         uint256 seriesAMaxSupply_,
         uint256 baseMinReleaseRate_,
-        uint256 seriesAMaxReleaseRate_
+        uint256 seriesAMaxReleaseRate_,
+        uint256 baseIntialMintedAmount_
     ) {
         require(mcbToken_.isContract(), "token must be contract");
         require(dataExchange_.isContract(), "data exchange must be contract");
@@ -110,12 +130,13 @@ contract Minter is ReentrancyGuard, Environment {
         seriesAMaxSupply = seriesAMaxSupply_;
         baseMinReleaseRate = baseMinReleaseRate_;
         seriesAMaxReleaseRate = seriesAMaxReleaseRate_;
+        baseMintedAmount = baseIntialMintedAmount_;
     }
 
     /**
      * @notice The start block to release MCB.
      */
-    function genesisBlock() public pure virtual returns (uint256) {
+    function genesisBlock() public view virtual returns (uint256) {
         return 0;
     }
 
@@ -151,17 +172,9 @@ contract Minter is ReentrancyGuard, Environment {
      *          This method updates both the base part and the series-A part. To see the rule, check ... for details.
      */
     function updateMintableAmount() public {
+        _updateExtraMintableAmount();
+        _updateSeriesAMintableAmount();
         _updateBaseMintableAmount();
-        _updateExtraMintableAmount();
-        _updateSeriesAMintableAmount();
-    }
-
-    /**
-     * @notice  Update the mintable amount for series-A separately.
-     */
-    function updateSeriesAMintableAmount() public {
-        _updateExtraMintableAmount();
-        _updateSeriesAMintableAmount();
     }
 
     /**
@@ -232,7 +245,7 @@ contract Minter is ReentrancyGuard, Environment {
 
         if (request.releaseType == ReleaseType.ToL1) {
             _mintToL1(request.recipient, request.amount);
-        } else if (request.releaseType == ReleaseType.ToL1) {
+        } else if (request.releaseType == ReleaseType.ToL2) {
             _mintToL2(
                 request.recipient,
                 request.amount,
@@ -271,7 +284,11 @@ contract Minter is ReentrancyGuard, Environment {
         seriesAMintedAmount = seriesAMintedAmount.add(amount);
     }
 
-    function _mintToL1(address recipient, uint256 amount) internal returns (uint256, uint256) {
+    function _mintToL1(address recipient, uint256 amount)
+        internal
+        virtual
+        returns (uint256, uint256)
+    {
         require(recipient != address(0), "recipient is the zero address");
         require(amount > 0, "amount is zero");
 
@@ -295,8 +312,13 @@ contract Minter is ReentrancyGuard, Environment {
         uint256 maxSubmissionCost,
         uint256 maxGas,
         uint256 gasPriceBid
+<<<<<<< HEAD
     ) internal returns (uint256, uint256) {
         IEthERC20Bridge erc20Bridge = IEthERC20Bridge(bridge);
+=======
+    ) internal virtual returns (uint256, uint256) {
+        IL2ERC20Bridge erc20Bridge = IL2ERC20Bridge(bridge);
+>>>>>>> update
         require(_isValidInbox(erc20Bridge.inbox()), "inbox is invalid");
         (uint256 toDevAmount, uint256 toRecipientAmount) = _mintToL1(address(this), amount);
         mcbToken.approve(bridge, toRecipientAmount);
@@ -325,7 +347,7 @@ contract Minter is ReentrancyGuard, Environment {
         address inbox,
         uint256 maxGas,
         uint256 gasPriceBid
-    ) internal returns (bool) {
+    ) internal virtual returns (bool) {
         require(_isValidInbox(inbox), "inbox is invalid");
         return
             dataExchange.tryFeedDataFromL1(
@@ -337,27 +359,16 @@ contract Minter is ReentrancyGuard, Environment {
             );
     }
 
-    function _isValidInbox(address inbox) internal view returns (bool) {
+    function _isValidInbox(address inbox) internal view virtual returns (bool) {
         IBridge trustedBridge = IBridge(IRollup(ROLLUP_ADDRESS).delayedBridge());
         return trustedBridge.allowedInboxes(inbox);
     }
 
-    function _getL2Sender(address bridge) internal view returns (address) {
+    function _getL2Sender(address bridge) internal view virtual returns (address) {
         address trustedBridge = IRollup(ROLLUP_ADDRESS).delayedBridge();
         require(trustedBridge == bridge, "not a valid l2 outbox");
         IOutbox outbox = IOutbox(IBridge(trustedBridge).activeOutbox());
         return outbox.l2ToL1Sender();
-    }
-
-    function _updateBaseMintableAmount() internal {
-        uint256 currentBlock = _getBlockNumber();
-        // if already updated
-        if (baseLastUpdateBlock >= currentBlock) {
-            return;
-        }
-        uint256 elapsedBlock = currentBlock.sub(baseLastUpdateBlock);
-        baseMintableAmount = baseMintableAmount.add(elapsedBlock.mul(baseMinReleaseRate));
-        baseLastUpdateBlock = currentBlock;
     }
 
     /**
@@ -365,38 +376,68 @@ contract Minter is ReentrancyGuard, Environment {
      *      **NOT** current block.
      */
     function _updateExtraMintableAmount() internal {
+        // update from async data source
         (uint256 capturedValue, uint256 capturedBlock) = _getTotalCapturedUSD();
-        if (lastValueCapturedBlock >= capturedBlock) {
+        uint256 elapsedBlock = _getElapsedBlockNumber(lastValueCapturedBlock, capturedBlock);
+        if (elapsedBlock == 0) {
             return;
         }
-        uint256 elapsedBlockUntilCaptured = capturedBlock.sub(_getLastValueCapturedBlock());
-        uint256 minimalMintableAmount = elapsedBlockUntilCaptured.mul(baseMinReleaseRate);
+        uint256 minimalMintableAmount = elapsedBlock.mul(baseMinReleaseRate);
         // base extra mintable amount
-        uint256 incrementalCapturedValue = capturedValue.sub(totalCapturedValue);
+        uint256 incrementalCapturedValue =
+            capturedValue.sub(totalCapturedValue, "decreased captured value");
         if (incrementalCapturedValue > minimalMintableAmount) {
             extraMintableAmount = extraMintableAmount.add(
                 incrementalCapturedValue.sub(minimalMintableAmount)
             );
         }
-        lastValueCapturedBlock = capturedBlock;
+        emit UpdateExtraMintableAmount(
+            lastValueCapturedBlock,
+            capturedBlock,
+            capturedValue,
+            extraMintableAmount
+        );
         totalCapturedValue = capturedValue;
+        lastValueCapturedBlock = capturedBlock;
     }
 
     function _updateSeriesAMintableAmount() public {
-        if (_getBlockNumber() <= _getSeriesALastUpdateBlock() || extraMintableAmount == 0) {
+        uint256 currentBlock = _getBlockNumber();
+        uint256 elapsedBlock = _getElapsedBlockNumber(seriesALastUpdateBlock, currentBlock);
+        // nothing to update
+        if (elapsedBlock == 0 || extraMintableAmount == 0) {
             return;
         }
+        // nothing to update
         uint256 remainSupply = seriesAMaxSupply.sub(seriesAMintedAmount).sub(seriesAMintableAmount);
         if (remainSupply == 0) {
             return;
         }
-        uint256 elapsedBlock = _getBlockNumber().sub(_getSeriesALastUpdateBlock());
         uint256 mintableAmount =
             elapsedBlock.mul(seriesAMaxReleaseRate).min(extraMintableAmount).min(remainSupply);
         // substract from extra, add to series-A
         seriesAMintableAmount = seriesAMintableAmount.add(mintableAmount);
         extraMintableAmount = extraMintableAmount.sub(mintableAmount);
-        seriesALastUpdateBlock = _getBlockNumber();
+        emit UpdateSeriesAMintableAmount(
+            seriesALastUpdateBlock,
+            currentBlock,
+            seriesAMintableAmount,
+            extraMintableAmount
+        );
+        seriesALastUpdateBlock = currentBlock;
+    }
+
+    function _updateBaseMintableAmount() internal {
+        uint256 currentBlock = _getBlockNumber();
+        uint256 elapsedBlock = _getElapsedBlockNumber(baseLastUpdateBlock, currentBlock);
+        // nothing to update
+        if (elapsedBlock == 0) {
+            return;
+        }
+        // update amount && block
+        baseMintableAmount = baseMintableAmount.add(elapsedBlock.mul(baseMinReleaseRate));
+        emit UpdateBaseMintableAmount(baseLastUpdateBlock, currentBlock, baseMintableAmount);
+        baseLastUpdateBlock = currentBlock;
     }
 
     function _getTotalCapturedUSD() internal view returns (uint256, uint256) {
@@ -408,16 +449,20 @@ contract Minter is ReentrancyGuard, Environment {
         return abi.decode(data, (uint256, uint256));
     }
 
-    function _getLastValueCapturedBlock() internal view returns (uint256) {
-        return lastValueCapturedBlock < genesisBlock() ? genesisBlock() : lastValueCapturedBlock;
+    function _getElapsedBlockNumber(uint256 begin, uint256 end) internal view returns (uint256) {
+        begin = _safeBlockNumber(begin);
+        if (begin > end) {
+            return 0;
+        }
+        return end.sub(begin);
     }
 
-    function _getSeriesALastUpdateBlock() internal view returns (uint256) {
-        return seriesALastUpdateBlock < genesisBlock() ? genesisBlock() : seriesALastUpdateBlock;
+    function _safeBlockNumber(uint256 blockNumber) internal view returns (uint256) {
+        return blockNumber < genesisBlock() ? genesisBlock() : blockNumber;
     }
 
     function _getBlockNumber() internal view virtual returns (uint256) {
-        return block.number;
+        return lastValueCapturedBlock;
     }
 
     bytes32[50] private __gap;

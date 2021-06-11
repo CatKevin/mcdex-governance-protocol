@@ -10,38 +10,54 @@ import "../Minter.sol";
 contract TestMinter is Minter {
     using Math for uint256;
     using SafeMath for uint256;
+
+    bool internal _useMockBlockNumber;
     uint256 internal _mockBlockNumber;
+
+    uint256 private _genesisBlock;
 
     constructor(
         address mintInitiator_,
         address mcbToken_,
-        address valueCapture_,
-        address seriesA_,
+        address dataExchange_,
+        address l2SeriesAVesting_,
         address devAccount_,
         uint256 baseMaxSupply_,
         uint256 seriesAMaxSupply_,
         uint256 baseMinReleaseRate_,
-        uint256 seriesAMaxReleaseRate_
+        uint256 seriesAMaxReleaseRate_,
+        uint256 baseIntialMintedAmount_
     )
         Minter(
             mintInitiator_,
             mcbToken_,
-            valueCapture_,
-            seriesA_,
+            dataExchange_,
+            l2SeriesAVesting_,
             devAccount_,
             baseMaxSupply_,
             seriesAMaxSupply_,
             baseMinReleaseRate_,
-            seriesAMaxReleaseRate_
+            seriesAMaxReleaseRate_,
+            baseIntialMintedAmount_
         )
     {}
 
+    function setGenesisBlock(uint256 blockNumber) public virtual {
+        _genesisBlock = blockNumber;
+    }
+
+    function genesisBlock() public view virtual override returns (uint256) {
+        return _genesisBlock;
+    }
+
     function setBlockNumber(uint256 blockNumber) public {
+        _useMockBlockNumber = true;
         _mockBlockNumber = blockNumber;
     }
 
     function _getBlockNumber() internal view virtual override returns (uint256) {
-        return _mockBlockNumber;
+        if (_useMockBlockNumber) return _mockBlockNumber;
+        return super._getBlockNumber();
     }
 
     function testSeriesAMint(address to, uint256 amount) external {

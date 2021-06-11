@@ -18,6 +18,6 @@ contract FastGovernorAlpha is GovernorAlpha {
     ) GovernorAlpha(dataExchange_, timelock_, comp_, guardian_, initialProposalId_) {}
 
     function votingPeriod() public pure virtual override returns (uint256) {
-        return 60;
+        return 300;
     }
 }

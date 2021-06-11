@@ -55,7 +55,7 @@ async function main(deployer, accounts) {
         deployer.addressOf("Timelock"),
         deployer.addressOf("XMCB"),
         owner.address,
-        22
+        25
     );
     // vault
     printInfo("creating Vault ...")
@@ -94,7 +94,7 @@ async function main(deployer, accounts) {
 
     printInfo("creating Minter ...")
     const mintInitiator = await deployer.deploy("MockMintInitiator")
-    await deployer.deploy(
+    const minter = await deployer.deploy(
         "MockMinter",
         deployer.addressOf("MockMintInitiator"),
         deployer.addressOf("MCB"),
@@ -105,8 +105,12 @@ async function main(deployer, accounts) {
         toWei("4000000"),
         toWei("0.2"),
         toWei("0.55392"),
+        0
     )
     await mintInitiator.initialize(deployer.addressOf("Authenticator"), deployer.addressOf("MockMinter"))
+    await mcb.grantRole(ethers.utils.id("MINT_ROLE"), minter.address);
+    // await minter.
+
     printInfo("done")
 }
 

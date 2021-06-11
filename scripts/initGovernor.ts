@@ -41,7 +41,8 @@ async function main(deployer, accounts) {
         ethers.utils.defaultAbiCoder.encode(["uint256"], [300]),
         eta
     ))
-    await sleep(20000)
+    await sleep(600000)
+    console.log("transfer admin")
     await ensureFinished(timelock.executeTransaction(
         timelock.address,
         0,
@@ -49,6 +50,7 @@ async function main(deployer, accounts) {
         ethers.utils.defaultAbiCoder.encode(["address"], [governor.address]),
         eta
     ))
+    console.log("set delay")
     await ensureFinished(timelock.executeTransaction(
         timelock.address,
         0,
