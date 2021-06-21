@@ -9,15 +9,6 @@ contract TestGovernorAlpha is GovernorAlpha {
     uint256 public mockBlockNumber;
     uint256 public mockBlockTimestamp;
 
-    constructor(
-        address mcb_,
-        address timelock_,
-        address comp_,
-        address guardian_
-    ) GovernorAlpha(0x0000000000000000000000000000000000000000, timelock_, comp_, guardian_, 1) {
-        mockMCB = mcb_;
-    }
-
     function skipBlock(uint256 count) public {
         if (mockBlockNumber == 0) {
             mockBlockNumber = block.number;
@@ -46,10 +37,6 @@ contract TestGovernorAlpha is GovernorAlpha {
 
     function _getBlockTimestamp() internal view virtual override returns (uint256) {
         return mockBlockTimestamp == 0 ? block.timestamp : mockBlockTimestamp;
-    }
-
-    function _getMCBTotalSupply() internal view virtual override returns (uint256) {
-        return IERC20Upgradeable(mockMCB).totalSupply();
     }
 
     function votingPeriod() public pure virtual override returns (uint256) {

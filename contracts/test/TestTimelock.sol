@@ -7,8 +7,6 @@ import "../Timelock.sol";
 contract TestTimelock is Timelock {
     uint256 public mockBlockTimestamp;
 
-    constructor(address admin_, uint256 delay_) Timelock(admin_, delay_) {}
-
     function setTimestamp(uint256 newTimestamp) public {
         mockBlockTimestamp = newTimestamp;
     }

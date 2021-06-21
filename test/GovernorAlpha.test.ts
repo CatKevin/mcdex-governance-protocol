@@ -56,7 +56,8 @@ describe('XMCB', () => {
         await xmcb.connect(user2).deposit(toWei("100"));
 
         const timelock = await createContract("Timelock", [user0.address, 86400]);
-        const governor = await createContract("TestGovernorAlpha", [mcb.address, timelock.address, xmcb.address, user0.address]);
+        const governor = await createContract("TestGovernorAlpha")
+        await governor.initialize(mcb.address, timelock.address, xmcb.address, user0.address, 1);
         const vault = await createContract("Vault");
         await vault.initialize(timelock.address);
         await usd.mint(vault.address, toWei("10"));
@@ -96,7 +97,8 @@ describe('XMCB', () => {
         await xmcb.connect(user2).deposit(toWei("1000"));
 
         const timelock = await createContract("TestTimelock", [user0.address, 86400]);
-        const governor = await createContract("TestGovernorAlpha", [mcb.address, timelock.address, xmcb.address, user0.address]);
+        const governor = await createContract("TestGovernorAlpha");
+        await governor.initialize(mcb.address, timelock.address, xmcb.address, user0.address, 1);
         var starttime = (await ethers.provider.getBlock()).timestamp;
         await timelock.skipTime(0);
 

@@ -3,16 +3,43 @@ pragma solidity 0.7.4;
 
 contract TestValueCapture {
     uint256 public capturedUSD;
+    uint256 public capturedBlock;
 
-    function setCapturedUSD(uint256 capturedUSD_) external {
-        capturedUSD = capturedUSD_;
+    address public minter;
+
+    constructor(address minter_) {
+        minter = minter_;
     }
 
-    function increaseCapturedUSD(uint256 incremental) external {
-        capturedUSD = capturedUSD + incremental;
+    function setCapturedUSD(uint256 capturedUSD_, uint256 capturedBlock_) external {
+        capturedUSD = capturedUSD_;
+        capturedBlock = capturedBlock_;
+
+        (bool success, bytes memory result) =
+            minter.call(
+                abi.encodeWithSignature(
+                    "onValueCaptured(uint256,uint256)",
+                    capturedUSD,
+                    capturedBlock
+                )
+            );
+        require(success, string(result));
     }
 
     function totalCapturedUSD() external view returns (uint256) {
         return capturedUSD;
+    }
+
+    function lastCapturedBlock() external view returns (uint256) {
+        return capturedBlock;
+    }
+
+    function getCapturedValue()
+        external
+        view
+        returns (uint256 totalCapturedUSD_, uint256 lastCapturedBlock_)
+    {
+        totalCapturedUSD_ = capturedUSD;
+        lastCapturedBlock_ = capturedBlock;
     }
 }

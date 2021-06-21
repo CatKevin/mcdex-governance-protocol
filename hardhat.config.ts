@@ -6,8 +6,7 @@ import "hardhat-contract-sizer";
 // import "hardhat-gas-reporter";
 // import "hardhat-abi-exporter";
 import "solidity-coverage"
-
-import { checkAuth, updateDataSource, showDetails, pushToL2, pushToL1 } from './scripts/dataExchangeTools'
+// import "hardhat-dependency-compiler"
 
 task("accounts", "Prints the list of accounts", async (args, hre) => {
     const accounts = await hre.ethers.getSigners();
@@ -92,52 +91,6 @@ task("call", "Call contract function")
         console.log(result);
     })
 
-
-task("checkAuth", "CONTRACT_CALL")
-    .addOptionalPositionalParam("key", "bytes32")
-    .addOptionalPositionalParam("account", "address")
-    .setAction(async (args, hre) => {
-        if (!args.key.startsWith("0x")) {
-            args.key = hre.ethers.utils.id(args.key)
-        }
-        await checkAuth(hre, args.key, args.account)
-    })
-
-task("updateDataSource", "CONTRACT_CALL")
-    .addOptionalPositionalParam("key", "bytes32")
-    .addOptionalPositionalParam("account", "address")
-    .setAction(async (args, hre) => {
-        await updateDataSource(hre, hre.ethers.utils.id(args.key), args.account)
-    })
-
-task("pushToL2", "CONTRACT_CALL")
-    .addOptionalPositionalParam("key", "bytes32")
-    .addOptionalPositionalParam("value", "bytes32")
-    .setAction(async (args, hre) => {
-        await pushToL2(
-            hre,
-            hre.ethers.utils.id(args.key),
-            hre.ethers.utils.defaultAbiCoder.encode(["bytes"], [args.value]))
-    })
-
-task("pushToL1", "CONTRACT_CALL")
-    .addOptionalPositionalParam("key", "bytes32")
-    .addOptionalPositionalParam("value", "bytes32")
-    .setAction(async (args, hre) => {
-        await pushToL1(
-            hre,
-            hre.ethers.utils.id(args.key),
-            hre.ethers.utils.solidityPack(["bytes"], [hre.ethers.utils.hexValue(Number(args.value))]))
-    })
-
-task("showDetails", "CONTRACT_CALL")
-    .setAction(async (args, hre) => {
-        await showDetails(hre)
-    })
-
-
-
-
 module.exports = {
     defaultNetwork: "hardhat",
     networks: {
@@ -192,5 +145,5 @@ module.exports = {
     },
     mocha: {
         timeout: 60000
-    }
+    },
 };

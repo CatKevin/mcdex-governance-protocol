@@ -1,27 +1,26 @@
 // SPDX-License-Identifier: GPL
 pragma solidity 0.7.4;
 
-import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/GSN/Context.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/EnumerableSet.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
 
 import "../../interfaces/IAuthenticator.sol";
 
-interface IXMCB is IERC20 {
+interface IXMCB is IERC20Upgradeable {
     function rawTotalSupply() external view returns (uint256);
 
     function rawBalanceOf(address account) external view returns (uint256);
 }
 
-contract RewardDistribution is Context, Ownable {
-    using Address for address;
-    using SafeMath for uint256;
-    using SafeERC20 for IERC20;
-    using EnumerableSet for EnumerableSet.AddressSet;
+contract RewardDistribution is OwnableUpgradeable {
+    using AddressUpgradeable for address;
+    using SafeMathUpgradeable for uint256;
+    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     bytes32 public constant REWARD_DISTRIBUTION_ADMIN_ROLE =
         keccak256("REWARD_DISTRIBUTION_ADMIN_ROLE");
@@ -30,7 +29,7 @@ contract RewardDistribution is Context, Ownable {
     IAuthenticator public authenticator;
 
     struct RewardPlan {
-        IERC20 rewardToken;
+        IERC20Upgradeable rewardToken;
         uint256 periodFinish;
         uint256 rewardRate;
         uint256 lastUpdateTime;
@@ -39,7 +38,7 @@ contract RewardDistribution is Context, Ownable {
         mapping(address => uint256) rewards;
     }
     mapping(address => RewardPlan) internal _rewardPlans;
-    EnumerableSet.AddressSet internal _activeReward;
+    EnumerableSetUpgradeable.AddressSet internal _activeReward;
 
     event RewardPaid(address indexed user, uint256 reward);
     event RewardAdded(uint256 reward, uint256 periodFinish);
@@ -64,9 +63,11 @@ contract RewardDistribution is Context, Ownable {
         _;
     }
 
-    constructor(address authenticator_, address XMCB_) Ownable() {
+    function initialize(address authenticator_, address XMCB_) external initializer {
         require(authenticator_.isContract(), "authenticator must be a contract");
         require(XMCB_.isContract(), "authenticator must be a contract");
+
+        __Ownable_init();
 
         authenticator = IAuthenticator(authenticator_);
         xmcb = IXMCB(XMCB_);
@@ -121,7 +122,7 @@ contract RewardDistribution is Context, Ownable {
         require(token != address(0), "invalid reward token");
         require(token.isContract(), "reward token must be contract");
         require(!hasPlan(token), "plan already exists");
-        _rewardPlans[token].rewardToken = IERC20(token);
+        _rewardPlans[token].rewardToken = IERC20Upgradeable(token);
         _rewardPlans[token].rewardRate = rewardRate;
         _activeReward.add(token);
         emit RewardPlanCreated(token, rewardRate);
@@ -281,4 +282,6 @@ contract RewardDistribution is Context, Ownable {
     function _getBlockNumber() internal view virtual returns (uint256) {
         return block.number;
     }
+
+    bytes32[50] private __gap;
 }

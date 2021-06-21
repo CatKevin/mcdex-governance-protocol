@@ -2,17 +2,17 @@
 pragma solidity 0.7.4;
 
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-import "./libraries/TokenConversion.sol";
-import "./interfaces/IAuthenticator.sol";
-import "./interfaces/IDataExchange.sol";
+import { ICaptureNotifyRecipient } from "./interfaces/ICaptureNotifyRecipient.sol";
+import { IUSDConvertor } from "./interfaces/IUSDConvertor.sol";
+import { IAuthenticator } from "./interfaces/IAuthenticator.sol";
 
 interface IDecimals {
     function decimals() external view returns (uint8);
@@ -23,26 +23,24 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
-    using TokenConversion for TokenEntry;
 
     uint256 public constant SYSTEM_DECIMALS = 18;
     bytes32 public constant VALUE_CAPTURE_ADMIN_ROLE = keccak256("VALUE_CAPTURE_ADMIN_ROLE");
-    bytes32 public constant TOTAL_CAPTURED_USD_KEY = keccak256("TOTAL_CAPTURED_USD_KEY");
 
     IAuthenticator public authenticator;
-    IDataExchange public dataExchange;
-
     address public vault;
+    address public captureNotifyRecipient;
     uint256 public totalCapturedUSD;
-    mapping(address => TokenEntry) public assetEntries;
+    uint256 public lastCapturedBlock;
 
     EnumerableSetUpgradeable.AddressSet internal _usdTokenList;
-    mapping(address => uint256) internal _normalizer;
+    mapping(address => uint256) public normalizers;
+    mapping(address => IUSDConvertor) public externalExchanges;
 
     event AddUSDToken(address indexed usdToken);
     event RemoveUSDToken(address indexed usdToken);
-    event SetConvertor(address indexed tokenAddress, address indexed convertor);
-    event ConvertToken(
+    event SetConvertor(address indexed tokenAddress, address indexed exchange);
+    event ExchangeToken(
         address indexed tokenIn,
         uint256 balanceIn,
         address indexed tokenOut,
@@ -52,6 +50,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
     event ForwardETH(uint256 amount);
     event ForwardERC20Token(address indexed tokenOut, uint256 amount);
     event ForwardERC721Token(address indexed tokenOut, uint256 tokenID);
+    event SetMiner(address indexed oldMinter, address indexed newMinter);
 
     receive() external payable {}
 
@@ -63,6 +62,10 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
         _;
     }
 
+    function getCapturedValue() public view returns (uint256, uint256) {
+        return (totalCapturedUSD, lastCapturedBlock);
+    }
+
     /**
      * @notice  Initialzie value capture contract.
      *
@@ -70,19 +73,20 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
      *                          admin interfaces.
      * @param   vault_          The address of vault contract. All funds later will be collected to this address.
      */
-    function initialize(
-        address authenticator_,
-        address dataExchange_,
-        address vault_
-    ) external initializer {
+    function initialize(address authenticator_, address vault_) external initializer {
         require(vault_ != address(0), "vault is the zero address");
         require(authenticator_.isContract(), "authenticator must be a contract");
 
         __ReentrancyGuard_init();
 
         authenticator = IAuthenticator(authenticator_);
-        dataExchange = IDataExchange(dataExchange_);
         vault = vault_;
+    }
+
+    function setCaptureNotifyRecipient(address newRecipient) external onlyAuthorized {
+        require(newRecipient != captureNotifyRecipient, "newRecipient is already set");
+        emit SetMiner(captureNotifyRecipient, newRecipient);
+        captureNotifyRecipient = newRecipient;
     }
 
     /**
@@ -125,9 +129,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
 
         bool isAdded = _usdTokenList.add(token);
         require(isAdded, "fail to add token to list");
-
-        uint256 normalizer = 10**(SYSTEM_DECIMALS.sub(decimals));
-        _normalizer[token] = normalizer;
+        normalizers[token] = 10**(SYSTEM_DECIMALS.sub(decimals));
 
         emit AddUSDToken(token);
     }
@@ -147,69 +149,52 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
     }
 
     /**
-     * @notice  Add a 'convertor' for some token.
-     *          A convertor is known as a external contract who has an interface to accept some kind of token
+     * @notice  Add a 'exchange' for some token.
+     *          A exchange is known as a external contract who has an interface to accept some kind of token
      *          and return USD token in value capture's whitelist.
-     *          That means the output token of convertor must be in th e whitelist.
-     *          See contract/interfaces/IUSDConvertor.sol for interface spec of a convertor.
+     *          That means the output token of exchange must be in th e whitelist.
+     *          See contract/interfaces/IUSDConvertor.sol for interface spec of a exchange.
      *
-     * @param   token               The address of any token accepted by convertor.
-     * @param   oracle              The address of oracle to read reference token price in USD.
-     * @param   convertor_          The address of convertor contract.
-     * @param   slippageTolerance   The max slippage can be accepted when convert token to USD, 100% = 1e18;
+     * @param   token               The address of any token accepted by exchange.
+     * @param   exchange_          The address of exchange contract.
      */
-    function setConvertor(
-        address token,
-        address oracle,
-        address convertor_,
-        uint256 slippageTolerance
-    ) external onlyAuthorized {
-        require(slippageTolerance <= 1e18, "slippage tolerance is out of range");
-        require(oracle.isContract(), "oracle must be a contract");
-        require(convertor_.isContract(), "convertor must be a contract");
-        IUSDConvertor convertor = IUSDConvertor(convertor_);
-        require(token == convertor.tokenIn(), "input token mismatch");
-        require(_usdTokenList.contains(convertor.tokenOut()), "token out is not in usd list");
+    function setExternalExchange(address token, address exchange_) external onlyAuthorized {
+        require(exchange_.isContract(), "exchange must be a contract");
+        IUSDConvertor exchange = IUSDConvertor(exchange_);
+        require(token == exchange.tokenIn(), "input token mismatch");
+        require(_usdTokenList.contains(exchange.tokenOut()), "token out is not in usd list");
 
-        assetEntries[token].update(oracle, convertor_, slippageTolerance);
-        emit SetConvertor(token, convertor_);
+        externalExchanges[token] = exchange;
+        emit SetConvertor(token, exchange_);
     }
+
+    // /**
+    //  * @notice  Exchange the all the given token stored in contract for USD token, then forward the USD token to vault.
+    //  *
+    //  * @param   token       The address of token to forward to vault.
+    //  * @param   amountIn    The amount to (exchange for USD and) forward to vault.
+    //  */
+    // function forwardAsset(address token, uint256 amountIn) external nonReentrant onlyAuthorized {
+    //     _forwardAsset(token, amountIn);
+    //     tryNotifyCapturedValue();
+    // }
 
     /**
-     * @notice  Exchange the all the given token stored in contract for USD token, then forward the USD token to vault.
+     * @notice  Batch version of forwardAsset.
      *
-     * @param   token   The address of token to forward to vault.
+     * @param   tokens      The array of address of token to forward to vault.
+     * @param   amountsIn   The array of amounts to (exchange for USD and) forward to vault.
      */
-    function forwardAsset(address token, uint256 amountIn) external nonReentrant {
-        require(vault != address(0), "vault is not set");
-        require(amountIn != 0, "amount in is zero");
-
-        // prepare token to be transfer to vault
-        (address tokenOut, uint256 amountOut) = _convertTokenToUSD(token, amountIn);
-        require(_usdTokenList.contains(tokenOut), "unexpected out token");
-
-        // transfer token to vault && add up the conveted amount
-        uint256 normalizer = _normalizer[tokenOut];
-        require(normalizer != 0, "unexpected normalizer");
-        uint256 normalizeAmountOut = amountOut.mul(normalizer);
-        totalCapturedUSD = totalCapturedUSD.add(normalizeAmountOut);
-        IERC20Upgradeable(tokenOut).safeTransfer(vault, amountOut);
-        // ignore the result so that the sync won't stuck the foward procedure
-        dataExchange.tryFeedDataFromL2(
-            TOTAL_CAPTURED_USD_KEY,
-            abi.encode(totalCapturedUSD, _getBlockNumber())
-        );
-
-        emit ForwardAsset(tokenOut, amountOut, normalizeAmountOut);
-    }
-
-    function feedCapturedValueToL1() external nonReentrant {
-        bool succeeded =
-            dataExchange.tryFeedDataFromL2(
-                TOTAL_CAPTURED_USD_KEY,
-                abi.encode(totalCapturedUSD, _getBlockNumber())
-            );
-        require(succeeded, "fail to feed captured value");
+    function forwardMultiAssets(address[] memory tokens, uint256[] memory amountsIn)
+        external
+        nonReentrant
+        onlyAuthorized
+    {
+        require(tokens.length == amountsIn.length, "length of parameters mismatch");
+        for ((uint256 i, uint256 count) = (0, tokens.length); i < count; i++) {
+            _forwardAsset(tokens[i], amountsIn[i]);
+        }
+        tryNotifyCapturedValue();
     }
 
     /**
@@ -224,8 +209,8 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
     }
 
     /**
-     * @notice  This method is should not be called if there are any convertor available for given ERC20 token.
-     *          But if there is really not, or the convertor is lack of enough liquidity,
+     * @notice  This method is should not be called if there are any exchange available for given ERC20 token.
+     *          But if there is really not, or the exchange is lack of enough liquidity,
      *          guardian will be able to send the asset to vault for other usage.
      *
      *          *Asset sent though this method to vault will not affect mintable amount of MCB.*
@@ -247,16 +232,37 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
         nonReentrant
     {
         require(vault != address(0), "vault is not set");
-        IERC721Upgradeable(token).safeTransferFrom(address(this), vault, tokenID);
+        IERC20Upgradeable(token).safeTransferFrom(address(this), vault, tokenID);
         emit ForwardERC721Token(token, tokenID);
     }
 
-    function _convertTokenToUSD(address tokenIn, uint256 amountIn)
+    function _forwardAsset(address token, uint256 amountIn) internal {
+        require(vault != address(0), "vault is not set");
+        require(amountIn != 0, "amount in is zero");
+
+        // prepare token to be transfer to vault
+        (address tokenOut, uint256 amountOut) = _exchangeTokenForUSD(token, amountIn);
+        require(_usdTokenList.contains(tokenOut), "unexpected out token");
+
+        // transfer token to vault && add up the conveted amount
+        uint256 normalizer = normalizers[tokenOut];
+        require(normalizer != 0, "unexpected normalizer");
+
+        uint256 normalizeAmountOut = amountOut.mul(normalizer);
+        totalCapturedUSD = totalCapturedUSD.add(normalizeAmountOut);
+        lastCapturedBlock = _getBlockNumber();
+
+        IERC20Upgradeable(tokenOut).safeTransfer(vault, amountOut);
+
+        emit ForwardAsset(tokenOut, amountOut, normalizeAmountOut);
+    }
+
+    function _exchangeTokenForUSD(address tokenIn, uint256 amountIn)
         internal
         returns (address tokenOut, uint256 amountOut)
     {
-        uint256 convertableAmount = IERC20Upgradeable(tokenIn).balanceOf(address(this));
-        require(amountIn <= convertableAmount, "amount in execceds convertable amount");
+        uint256 tokenInBalance = IERC20Upgradeable(tokenIn).balanceOf(address(this));
+        require(amountIn <= tokenInBalance, "amount in execceds convertable amount");
         if (amountIn == 0) {
             // early revert
             revert("no balance to convert");
@@ -265,18 +271,32 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
             tokenOut = tokenIn;
             amountOut = amountIn;
         } else {
-            require(assetEntries[tokenIn].isAvailable(), "token has no convertor");
-            require(tokenIn == assetEntries[tokenIn].tokenIn(), "input token mismatch");
-            // not necessary, but double check to prevent unexpected nested call.
-            tokenOut = assetEntries[tokenIn].tokenOut();
-            amountOut = assetEntries[tokenIn].convert(amountIn);
+            IUSDConvertor exchange = externalExchanges[tokenIn];
+            require(address(exchange).isContract(), "token exchange is not available");
+            require(tokenIn == exchange.tokenIn(), "input token mismatch");
+            tokenOut = externalExchanges[tokenIn].tokenOut();
+
+            IERC20Upgradeable(tokenIn).safeIncreaseAllowance(address(exchange), amountIn);
+            amountOut = externalExchanges[tokenIn].exchangeForUSD(amountIn);
         }
         require(amountOut > 0, "balance out is 0");
-        emit ConvertToken(tokenIn, amountIn, tokenOut, amountOut);
+        emit ExchangeToken(tokenIn, amountIn, tokenOut, amountOut);
     }
 
     function _getBlockNumber() internal view virtual returns (uint256) {
         return block.number;
+    }
+
+    function tryNotifyCapturedValue() public onlyAuthorized {
+        if (!captureNotifyRecipient.isContract()) {
+            return;
+        }
+        try
+            ICaptureNotifyRecipient(captureNotifyRecipient).onValueCaptured(
+                totalCapturedUSD,
+                lastCapturedBlock
+            )
+        {} catch {}
     }
 
     bytes32[50] private __gap;

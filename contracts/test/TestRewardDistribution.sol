@@ -7,8 +7,6 @@ import "../components/staking/RewardDistribution.sol";
 contract TestRewardDistribution is RewardDistribution {
     uint256 public mockBlockNumber;
 
-    constructor(address owner_, address baseToken_) RewardDistribution(owner_, baseToken_) {}
-
     function setBlockNumber(uint256 blockNumber) public {
         mockBlockNumber = blockNumber;
     }

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BSD
 pragma solidity 0.7.4;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-contract Timelock {
-    using Address for address;
-    using SafeMath for uint256;
+contract Timelock is Initializable {
+    using AddressUpgradeable for address;
+    using SafeMathUpgradeable for uint256;
 
     event NewAdmin(address indexed newAdmin);
     event NewPendingAdmin(address indexed newPendingAdmin);
@@ -46,7 +47,7 @@ contract Timelock {
 
     mapping(bytes32 => bool) public queuedTransactions;
 
-    constructor(address admin_, uint256 delay_) {
+    function initialize(address admin_, uint256 delay_) external initializer {
         require(delay_ >= MINIMUM_DELAY, "Delay must exceed minimum delay.");
         require(delay_ <= MAXIMUM_DELAY, "Delay must not exceed maximum delay.");
 
@@ -145,4 +146,6 @@ contract Timelock {
         // solium-disable-next-line security/no-block-members
         return block.timestamp;
     }
+
+    bytes32[50] private __gap;
 }

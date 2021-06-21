@@ -32,9 +32,11 @@
     "hardhat": "^2.0.2",
     "hardhat-abi-exporter": "^2.0.6",
     "hardhat-contract-sizer": "^2.0.2",
+    "hardhat-dependency-compiler": "^1.1.1",
     "hardhat-gas-reporter": "^1.0.0",
     "hardhat-typechain": "^0.3.3",
     "mocha": "^8.2.1",
+    "sol-merger": "^3.1.0",
     "solidity-coverage": "^0.7.12",
     "ts-generator": "^0.1.1",
     "ts-node": "^9.0.0",
@@ -48,6 +50,7 @@
     "@optionality.io/clone-factory": "^0.2.1",
     "@uniswap/lib": "^2.0.6",
     "@uniswap/v2-core": "^1.0.1",
+    "arb-ts": "^0.0.19",
     "bignumber.js": "^9.0.1"
   }
 }

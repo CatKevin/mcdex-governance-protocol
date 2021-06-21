@@ -1,6 +1,6 @@
 const ethers = require("ethers")
 import { Bridge } from 'arb-ts'
-import { KOVAN as ENV } from './env'
+import { RINKEBY as ENV } from './env'
 import {
     toWei,
     sleep,
@@ -8,7 +8,7 @@ import {
     printError
 } from './utils'
 
-const TRANSACTION_RECIPIENT = "0x5D155F969F5E6DB3FEeaA103853f42907B44f474"
+const TRANSACTION_RECIPIENT = "0x272fD185f10af2115BA2F82230fBb588B967aBCd"
 const L1_RPC_CALLER_PRIVATE_KEY = process.env["CROSS_KEEPER_PRIVATE_KEY"]
 const MAX_RETRY = 1
 
@@ -19,11 +19,11 @@ async function main() {
     const connectedL1Wallet = new ethers.Wallet(L1_RPC_CALLER_PRIVATE_KEY, ethProvider)
     const connectedL2Wallet = new ethers.Wallet(L1_RPC_CALLER_PRIVATE_KEY, arbProvider)
 
-    const bridge = new Bridge(
-        ENV.ERC20_BRIDGE_ADDRESS,
-        ENV.ARB_ERC20_BRIDGE_ADDRESS,
+    const bridge = await Bridge.init(
         connectedL1Wallet,
-        connectedL2Wallet
+        connectedL2Wallet,
+        ENV.L1_GATEWAY_ROUTER,
+        ENV.L2_GATEWAY_ROUTER,
     )
 
     let events = (await bridge.getL2ToL1EventData(TRANSACTION_RECIPIENT))

@@ -1,9 +1,9 @@
 const chalk = require('chalk')
 
-import { Deployer } from './deployer/deployer'
-import { DeploymentOptions } from './deployer/deployer'
-import { readOnlyEnviron } from './deployer/environ'
-import { sleep, ensureFinished, printInfo } from './deployer/utils'
+import { Deployer } from '../deployer/deployer'
+import { DeploymentOptions } from '../deployer/deployer'
+import { readOnlyEnviron } from '../deployer/environ'
+import { sleep, ensureFinished, printInfo } from '../deployer/utils'
 
 const ROLLUP_ADDRESS = "0x19914a2873136aE17E25E4eff6088BF17f3ea3a3"
 

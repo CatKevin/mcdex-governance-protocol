@@ -3,12 +3,12 @@ pragma solidity 0.7.4;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-import "./interfaces/IDataExchange.sol";
+import { IComp } from "./interfaces/IComp.sol";
+import { ITimelock } from "./interfaces/ITimelock.sol";
 
-contract GovernorAlpha {
-    bytes32 public constant MCB_TOTAL_SUPPLY_KEY = keccak256("MCB_TOTAL_SUPPLY_KEY");
-
+contract GovernorAlpha is Initializable {
     /// @notice The name of this contract
     string public constant name = "MCDEX DAO Governor Alpha";
 
@@ -40,13 +40,13 @@ contract GovernorAlpha {
     } // ~3 days in blocks (assuming 15s blocks)
 
     /// @notice The address of the Compound Protocol Timelock
-    TimelockInterface public timelock;
+    ITimelock public timelock;
 
     /// @notice The address of the Compound governance token
-    CompInterface public comp;
+    IComp public comp;
 
-    /// @notice The data exchange contract to exchange data between L1/L2
-    IDataExchange public dataExchange;
+    /// @notice The address of L2 MCB Token.
+    IERC20Upgradeable public mcbToken;
 
     /// @notice The address of the Governor Guardian
     address public guardian;
@@ -142,16 +142,16 @@ contract GovernorAlpha {
     /// @notice An event emitted when a proposal has been executed in the Timelock
     event ProposalExecuted(uint256 id);
 
-    constructor(
-        address dataExchange_,
+    function initialize(
+        address mcbToken_,
         address timelock_,
         address comp_,
         address guardian_,
         uint256 initialProposalId_
-    ) {
-        dataExchange = IDataExchange(dataExchange_);
-        timelock = TimelockInterface(timelock_);
-        comp = CompInterface(comp_);
+    ) external initializer {
+        mcbToken = IERC20Upgradeable(mcbToken_);
+        timelock = ITimelock(timelock_);
+        comp = IComp(comp_);
         guardian = guardian_;
         initialProposalId = initialProposalId_;
     }
@@ -471,46 +471,8 @@ contract GovernorAlpha {
     }
 
     function _getMCBTotalSupply() internal view virtual returns (uint256) {
-        (bytes memory data, bool exist) = dataExchange.getData(MCB_TOTAL_SUPPLY_KEY);
-        require(exist, "no total supply data feeded");
-        return abi.decode(data, (uint256));
+        return mcbToken.totalSupply();
     }
-}
 
-interface TimelockInterface {
-    function delay() external view returns (uint256);
-
-    function GRACE_PERIOD() external view returns (uint256);
-
-    function acceptAdmin() external;
-
-    function queuedTransactions(bytes32 hash) external view returns (bool);
-
-    function queueTransaction(
-        address target,
-        uint256 value,
-        string calldata signature,
-        bytes calldata data,
-        uint256 eta
-    ) external returns (bytes32);
-
-    function cancelTransaction(
-        address target,
-        uint256 value,
-        string calldata signature,
-        bytes calldata data,
-        uint256 eta
-    ) external;
-
-    function executeTransaction(
-        address target,
-        uint256 value,
-        string calldata signature,
-        bytes calldata data,
-        uint256 eta
-    ) external payable returns (bytes memory);
-}
-
-interface CompInterface {
-    function getPriorVotes(address account, uint256 blockNumber) external view returns (uint96);
+    bytes32[50] private __gap;
 }

@@ -6,7 +6,5 @@ interface IUSDConvertor {
 
     function tokenOut() external view returns (address);
 
-    function exchange(uint256 amountIn)
-        external
-        returns (uint256 normalizedPrice, uint256 amountOut);
+    function exchangeForUSD(uint256 amountIn) external returns (uint256 amountOut);
 }

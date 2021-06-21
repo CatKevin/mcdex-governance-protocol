@@ -1,4 +1,5 @@
-import { expect } from "chai";
+const { ethers } = require("hardhat");
+import { expect, use } from "chai";
 import {
     toWei,
     fromWei,
@@ -14,8 +15,11 @@ describe('Minter', () => {
     let user1;
     let user2;
     let user3;
-    let seriesA;
-    let vault;
+
+    let mcb;
+    let auth;
+    let valueCapture;
+    let minter;
 
     before(async () => {
         accounts = await getAccounts();
@@ -23,363 +27,375 @@ describe('Minter', () => {
         user1 = accounts[1];
         user2 = accounts[2];
         user3 = accounts[3];
-        seriesA = accounts[4];
     })
 
-    it("constructor", async () => {
-        const mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
-        const dataExchange = await createContract("MockDataExchange");
+    beforeEach(async () => {
+        auth = await createContract("Authenticator");
+        await auth.initialize();
 
-        await expect(createContract("TestMinter", [
-            user0.address,
-            dataExchange.address,
-            seriesA.address,
-            user2.address,
-            toWei("5000000"),
-            toWei("5000000"),
-            toWei("0.2"),
-            toWei("0.55392"),
-        ])).to.be.revertedWith("token must be contract");
-
-        await expect(createContract("TestMinter", [
+        mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
+        minter = await createContract("TestMCBMinter")
+        await minter.initialize(
+            auth.address,
             mcb.address,
-            user0.address,
-            seriesA.address,
-            user2.address,
-            toWei("5000000"),
-            toWei("5000000"),
-            toWei("0.2"),
-            toWei("0.55392"),
-        ])).to.be.revertedWith("data exchange must be contract");
+            user1.address,
+            100,
+            toWei("2000000"),
+            toWei("0.2")
+        );
+        valueCapture = await createContract("TestValueCapture", [minter.address])
+
+        await mcb.grantRole(ethers.utils.id("MINTER_ROLE"), minter.address)
+        await auth.grantRole(ethers.utils.id("VALUE_CAPTURE_ROLE"), valueCapture.address)
     })
 
-    it("mint - no caputre value", async () => {
-        const mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
-        const dataExchange = await createContract("MockDataExchange");
+    const isDefined = (x) => {
+        return typeof x != 'undefined'
+    }
 
-        const minter = await createContract("TestMinter", [
+    const caseTester = async (contracts, cases, isNonStatic = false) => {
+        const runCase = async (element, isNonStatic) => {
+            if (isDefined(element.name)) {
+                console.log("         - CASE =>", element.name)
+            } else {
+                console.log("         - CASE", i)
+            }
+            // console.log(element)
+            if (isDefined(element.block)) {
+                // console.log("setBlockNumber")
+                await contracts.minter.setBlockNumber(element.block)
+            }
+            if (isDefined(element.capture)) {
+                // console.log("setCapturedUSD")
+                await contracts.valueCapture.setCapturedUSD(element.capture[1], element.capture[0])
+            }
+            if (isNonStatic) {
+                await contracts.minter.updateMintableAmount();
+            }
+            const { baseMintableAmount, roundMintableAmounts } = await minter.callStatic.getMintableAmounts()
+            if (isDefined(element.base)) {
+                // console.log("checkBase")
+                expect(baseMintableAmount, `${i}.base missmatch`).to.equal(element.base)
+            }
+            if (isDefined(element.extra)) {
+                // console.log("checkExtra")
+                expect(await minter.extraMintableAmount(), `${i}.extra missmatch`).to.equal(element.extra)
+            }
+            if (isDefined(element.rounds)) {
+                // console.log("checkRounds")
+                for (var j = 0; j < element.rounds.length; j++) {
+                    expect(roundMintableAmounts[j], `${i}.round.${j} missmatch`).to.equal(element.rounds[j])
+                }
+            }
+        }
+        console.log(`       ${isNonStatic ? "NON-STATIC CASES" : "STATIC CASES"}`)
+        for (var i = 0; i < cases.length; i++) {
+
+            await runCase(cases[i], isNonStatic)
+        }
+    }
+
+    it("reinitialize", async () => {
+        await expect(minter.initialize(
+            auth.address,
             mcb.address,
-            dataExchange.address,
-            seriesA.address,
-            user2.address,
-            toWei("5000000"),
-            toWei("5000000"),
-            toWei("0.2"),
-            toWei("0.55392"),
-        ]);
-        await mcb.grantRole(await mcb.MINTER_ROLE(), minter.address);
-
-        await minter.setBlockNumber(0)
-        expect(await minter.callStatic.updateAndGetSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.callStatic.updateAndGetBaseMintableAmount()).to.equal(toWei("0"))
-
-        await minter.setBlockNumber(1)
-        expect(await minter.callStatic.updateAndGetSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.callStatic.updateAndGetBaseMintableAmount()).to.equal(toWei("0.2"))
-
-        await minter.setBlockNumber(10)
-        expect(await minter.callStatic.updateAndGetSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.callStatic.updateAndGetBaseMintableAmount()).to.equal(toWei("2"))
-
-        await minter.setBlockNumber(10)
-        expect(await minter.callStatic.updateAndGetSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.callStatic.updateAndGetBaseMintableAmount()).to.equal(toWei("2"))
-
-        await dataExchange.setTotalCapturedUSD(toWei("0.4"), 1);  // min = 0.2 extra = 0.2
-        await minter.setBlockNumber(1)
-        expect(await minter.callStatic.updateAndGetSeriesAMintableAmount()).to.equal(toWei("0.2"))
-        expect(await minter.callStatic.updateAndGetBaseMintableAmount()).to.equal(toWei("0.2"))
-
-        await dataExchange.setTotalCapturedUSD(toWei("1.0"), 1);  // min 0.2 + extra1 0.55392 + extra2 (1-0.2-0.55392)
-        await minter.setBlockNumber(1)
-        expect(await minter.callStatic.updateAndGetSeriesAMintableAmount()).to.equal(toWei("0.55392"))
-        expect(await minter.callStatic.updateAndGetBaseMintableAmount()).to.equal(toWei("0.44608"))
+            user1.address,
+            100,
+            toWei("2000000"),
+            toWei("0.2")
+        )).to.be.revertedWith("contract is already initialized");
     })
 
-    it("mint - base -> series-a -> base", async () => {
-        const mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
-        const dataExchange = await createContract("MockDataExchange");
+    it("base release", async () => {
+        await minter.setBlockNumber(1) // < 100
+        await caseTester({ minter, valueCapture }, [
+            {
+                base: 0,
+                extra: 0,
+            },
+            {
+                block: 101,
+                base: toWei("0.2"),
+            },
+            {
+                block: 1110,
+                base: toWei("202"),
+            },
+            {
+                block: 40000099,
+                base: toWei("7999999.8"),
+            },
+            {
+                block: 40000100,
+                base: toWei("8000000"),
+            },
+            {
+                block: 50000100,
+                base: toWei("8000000"),
+            },
+        ])
+    })
 
-        const minter = await createContract("TestMinter", [
-            mcb.address,
-            dataExchange.address,
-            seriesA.address,
+    it("base mint", async () => {
+        await minter.setBlockNumber(1110) // < 100
+        const { baseMintableAmount, } = await minter.callStatic.getMintableAmounts()
+        expect(baseMintableAmount).to.equal(toWei("202"))
+        {
+            await expect(minter.connect(user2).mintFromBase(user2.address, toWei("200"))).to.be.revertedWith("caller is not authorized")
+            expect(await mcb.balanceOf(user3.address)).to.equal(toWei("0"))
+            await minter.mintFromBase(user3.address, toWei("200"))
+            expect(await mcb.balanceOf(user3.address)).to.equal(toWei("150"))
+            expect(await mcb.balanceOf(user1.address)).to.equal(toWei("50"))
+        }
+        {
+            const { baseMintableAmount, } = await minter.callStatic.getMintableAmounts()
+            expect(baseMintableAmount).to.equal(toWei("2"))
+            expect(await mcb.balanceOf(user3.address)).to.equal(toWei("150"))
+            await minter.mintFromBase(user3.address, toWei("2"))
+            expect(await mcb.balanceOf(user3.address)).to.equal(toWei("151.5"))
+            expect(await mcb.balanceOf(user1.address)).to.equal(toWei("50.5"))
+        }
+        {
+            const { baseMintableAmount, } = await minter.callStatic.getMintableAmounts()
+            expect(baseMintableAmount).to.equal(toWei("0"))
+            await expect(minter.mintFromBase(user3.address, toWei("1"))).to.be.revertedWith("amount exceeds max mintable amount")
+        }
+        {
+            // surpass max base supply
+            await minter.setBlockNumber(50000100) // < 100
+            const { baseMintableAmount, } = await minter.callStatic.getMintableAmounts()
+            expect(baseMintableAmount).to.equal(toWei("7999798"))
+        }
+    })
+
+    it("extra mintable", async () => {
+        await caseTester({ minter, valueCapture }, [
+            {
+                base: 0,
+                extra: 0,
+            },
+            {
+                block: 101,
+                base: toWei("0.2"),
+                extra: 0
+            },
+            {
+                block: 110,
+                capture: [105, toWei("2")],
+                extra: toWei("1"),
+                base: toWei("3"),
+            },
+            {
+                capture: [115, toWei("96")],
+                extra: toWei("93"),
+                base: toWei("95"),
+            },
+            {
+                block: 115,
+                extra: toWei("93"),
+                base: toWei("96"),
+            },
+        ])
+    })
+
+    it("round mint - 2", async () => {
+        await minter.setBlockNumber(1) // < 100
+        await minter.newRound(
             user2.address,
-            toWei("5000000"),
-            toWei("5000000"),
-            toWei("0.2"),
+            toWei("700000"),
             toWei("0.5"),
-        ]);
-        await mcb.grantRole(await mcb.MINTER_ROLE(), minter.address);
-
-        await minter.setBlockNumber(0)
-        expect(await minter.callStatic.updateAndGetSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.callStatic.updateAndGetBaseMintableAmount()).to.equal(toWei("0"))
-
-        await dataExchange.setTotalCapturedUSD(toWei("6000000"), 1);
-        await minter.setBlockNumber(1)
-        expect(await minter.callStatic.updateAndGetSeriesAMintableAmount()).to.equal(toWei("0.5"))
-        expect(await minter.callStatic.updateAndGetBaseMintableAmount()).to.equal(toWei("5000000"))
-        // await minter.updateMintableAmount();
-        // expect(await minter.callStatic.totalCapturedValue()).to.equal(toWei("6000000"))
-
-        await minter.setBlockNumber(10)
-        expect(await minter.callStatic.updateAndGetSeriesAMintableAmount()).to.equal(toWei("5"))
-        expect(await minter.callStatic.updateAndGetBaseMintableAmount()).to.equal(toWei("5000000"))
-
-        await dataExchange.setTotalCapturedUSD(toWei("8000000"), 10000000);  // min = 0.2 extra = 0.2
-        await minter.setBlockNumber(10000000)
-        // extra = 8000000 - 20000000 = 6000000
-        expect(await minter.callStatic.updateAndGetSeriesAMintableAmount()).to.equal(toWei("5000000"))
-        expect(await minter.callStatic.updateAndGetBaseMintableAmount()).to.equal(toWei("3000000"))
-
-        await dataExchange.setTotalCapturedUSD(toWei("1"), 1);  // min = 0.2 extra = 0.2
-        await minter.setBlockNumber(1)
-        await minter.updateMintableAmount();
-        // 0.8 - 0.5
-        expect(await minter.callStatic.updateAndGetSeriesAMintableAmount()).to.equal(toWei("0.5"))
-        expect(await minter.callStatic.updateAndGetBaseMintableAmount()).to.equal(toWei("0.5")) // 0.2 + 0.3
-        expect(await minter.callStatic.extraMintableAmount()).to.equal(toWei("0.3"))
-
-        await minter.setBlockNumber(2)
-        await minter.updateSeriesAMintableAmount();
-        expect(await minter.callStatic.updateAndGetSeriesAMintableAmount()).to.equal(toWei("0.8"))
-        expect(await minter.callStatic.updateAndGetBaseMintableAmount()).to.equal(toWei("0.4")) // 0.2 + 0.3
-        expect(await minter.callStatic.extraMintableAmount()).to.equal(toWei("0"))
+            110,
+        )
+        await caseTester({ minter, valueCapture }, [
+            {
+                base: 0,
+                extra: 0,
+                rounds: [0]
+            },
+            {
+                block: 110,
+                base: toWei("2"),
+                extra: 0,
+                rounds: [0]
+            },
+            {
+                capture: [110, toWei("20")],
+                base: toWei("20"),
+                extra: toWei("18"),
+                rounds: [0]
+            },
+            {
+                block: 120,
+                capture: [120, toWei("30")],
+                extra: toWei("26"),
+                base: toWei("25"),
+                rounds: [toWei("5")]
+            },
+            {
+                block: 130,
+                capture: [120, toWei("30")],
+                extra: toWei("26"),
+                base: toWei("27"),
+                rounds: [toWei("5")]
+            },
+            {
+                block: 130,
+                capture: [130, toWei("30")],
+                extra: toWei("26"),
+                base: toWei("22"),
+                rounds: [toWei("10")]
+            },
+        ])
     })
 
-    it("change dev account", async () => {
-        const mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
-        const dataExchange = await createContract("MockDataExchange");
-
-        const minter = await createContract("TestMinter", [
-            mcb.address,
-            dataExchange.address,
-            seriesA.address,
+    it("round mint - more rounds | static", async () => {
+        await minter.setBlockNumber(1) // < 100
+        // round - 0
+        await minter.newRound(
             user2.address,
-            toWei("5000000"),
-            toWei("5000000"),
-            toWei("0.2"),
-            toWei("0.55392"),
-        ]);
-        await mcb.grantRole(await mcb.MINTER_ROLE(), minter.address);
-
-        await minter.connect(user2).setDevAccount(user3.address);
-        expect(await minter.devAccount()).to.equal(user3.address);
-        await expect(minter.setDevAccount(user3.address)).to.be.revertedWith("caller must be dev account")
-        await expect(minter.connect(user3).setDevAccount(user3.address)).to.be.revertedWith("already dev account")
-    })
-
-    it("mockcase ", async () => {
-        const mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
-        const dataExchange = await createContract("MockDataExchange");
-
-        const minter = await createContract("TestMinter", [
-            mcb.address,
-            dataExchange.address,
-            seriesA.address,
+            toWei("700000"),
+            toWei("0.5"),
+            110,
+        )
+        // round - 1
+        await minter.newRound(
             user2.address,
-            toWei("5"),
-            toWei("5"),
+            toWei("200000"),
             toWei("0.2"),
-            toWei("0.3"),
-        ]);
-        await mcb.grantRole(await mcb.MINTER_ROLE(), minter.address);
-
-        await minter.setBlockNumber(0)
-        expect(await minter.callStatic.getSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.callStatic.getBaseMintableAmount()).to.equal(toWei("0"))
-
-        await dataExchange.setTotalCapturedUSD(toWei("1.5"), 1);
-        await minter.setBlockNumber(2)
-        await minter.updateMintableAmount();
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0.6")) // max(0.3 * 2, extra)
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("1.1")) // 0.2 * 2 + 0.7
-        expect(await minter.extraMintableAmount()).to.equal(toWei("0.7"))  // 1.5 - 0.2 * 1 - 0.6
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0.4"))  // 1.5 - 0.2 * 1 - 0.6
-
-        await minter.testSeriesAMint(user2.address, toWei("0.6"))
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0")) // 0.6 - 0.6
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("1.1"))
-        expect(await minter.extraMintableAmount()).to.equal(toWei("0.7"))
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0.4"))  // 1.5 - 0.2 * 1 - 0.6
-        expect(await minter.seriesAMintedAmount()).to.equal(toWei("0.6"))
-
-        await minter.testBaseMint(user2.address, toWei("0.2"))
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("0.9")) // 1.1 - 0.2
-        expect(await minter.extraMintableAmount()).to.equal(toWei("0.7"))
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0.2"))
-        expect(await minter.baseMintedAmount()).to.equal(toWei("0.2"))
-
-        await minter.testBaseMint(user2.address, toWei("0.9"))
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("0")) // 0.9 - 0.9
-        expect(await minter.extraMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.baseMintedAmount()).to.equal(toWei("1.1"))
-
-        await dataExchange.setTotalCapturedUSD(toWei("5"), 2); // +3.5
-        await minter.updateMintableAmount();
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("3.3")) // extra
-        expect(await minter.extraMintableAmount()).to.equal(toWei("3.3")) // 3.5 - 0.2
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.baseMintedAmount()).to.equal(toWei("1.1")) // 3.3 + 1.1 = 4.4
-
-        await dataExchange.setTotalCapturedUSD(toWei("6"), 3); // +1
-        await minter.updateMintableAmount();
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("3.9")) // extra
-        expect(await minter.extraMintableAmount()).to.equal(toWei("4.1")) // 3.3 + 1 - 0.2
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.baseMintedAmount()).to.equal(toWei("1.1")) // 3.3 + 1.1 = 4.4
-
-        await minter.setBlockNumber(3)
-        await minter.updateMintableAmount();
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0.3"))
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("3.9")) // min(3.8 + 0.2, 3.9)
-        expect(await minter.extraMintableAmount()).to.equal(toWei("3.8")) // 4.1 - 0.3
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0.2"))
-        expect(await minter.baseMintedAmount()).to.equal(toWei("1.1")) // 3.3 + 1.1 = 4.4
-
-        await minter.testBaseMint(user2.address, toWei("3.9"))
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0.3"))
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("0")) // min(3.8 + 0.2, 3.9)
-        expect(await minter.extraMintableAmount()).to.equal(toWei("0.1")) // 4.1 - 0.3
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.baseMintedAmount()).to.equal(toWei("5")) // 3.3 + 1.1 = 4.4
-
-        await minter.setBlockNumber(4)
-        await minter.updateMintableAmount();
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0.4"))
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("0")) // min(3.8 + 0.2, 3.9)
-        expect(await minter.extraMintableAmount()).to.equal(toWei("0")) // 4.1 - 0.3
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0.2"))
-        expect(await minter.baseMintedAmount()).to.equal(toWei("5")) // 3.3 + 1.1 = 4.4
-
-        await minter.setBlockNumber(5)
-        await dataExchange.setTotalCapturedUSD(toWei("7"), 4); // +1
-        await minter.updateMintableAmount();
-        // await minter.updateSeriesAMintableAmount();
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0.7"))
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.extraMintableAmount()).to.equal(toWei("0.5"))
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0.4")) // 0.2
-        expect(await minter.baseMintedAmount()).to.equal(toWei("5"))
-
-        await minter.setBlockNumber(6)
-        await dataExchange.setTotalCapturedUSD(toWei("1000"), 5); // +993
-        await minter.updateMintableAmount();
-        // await minter.updateSeriesAMintableAmount();
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("1"))
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.extraMintableAmount()).to.equal(toWei("993"))
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0.6")) // 0.2
-        expect(await minter.baseMintedAmount()).to.equal(toWei("5"))
-
-        await minter.setBlockNumber(26)
-        await minter.updateMintableAmount();
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("4.4"))
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.extraMintableAmount()).to.equal(toWei("989.6"))
-        expect(await minter.baseMintableAmount()).to.equal(toWei("4.6"))
-        expect(await minter.baseMintedAmount()).to.equal(toWei("5"))
-        expect(await minter.seriesAMintedAmount()).to.equal(toWei("0.6"))
-
-        await minter.testSeriesAMint(user2.address, toWei("4.4"))
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.extraMintableAmount()).to.equal(toWei("989.6"))
-        expect(await minter.baseMintableAmount()).to.equal(toWei("4.6"))
-        expect(await minter.baseMintedAmount()).to.equal(toWei("5"))
-        expect(await minter.seriesAMintedAmount()).to.equal(toWei("5"))
-
-        await minter.setBlockNumber(36)
-        await minter.updateMintableAmount();
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.extraMintableAmount()).to.equal(toWei("989.6"))
-        expect(await minter.baseMintableAmount()).to.equal(toWei("6.6"))
-        expect(await minter.baseMintedAmount()).to.equal(toWei("5"))
-        expect(await minter.seriesAMintedAmount()).to.equal(toWei("5"))
+            150,
+        )
+        await caseTester({ minter, valueCapture }, [
+            {
+                base: 0,
+                extra: 0,
+                rounds: [0]
+            },
+            {
+                block: 110,
+                extra: 0,
+                base: toWei("2"),
+                rounds: [0]
+            },
+            {
+                capture: [110, toWei("20")],
+                extra: toWei("18"),
+                base: toWei("20"),
+                rounds: [0]
+            },
+            {
+                block: 120,
+                capture: [120, toWei("30")],
+                extra: toWei("26"),
+                base: toWei("25"),
+                rounds: [toWei("5"), toWei("0")]
+            },
+            {
+                block: 160,
+                extra: toWei("26"),
+                base: toWei("33"), // + 40 * 0.2 = 6
+                rounds: [toWei("5"), toWei("0")]
+            },
+            {
+                capture: [150, toWei("50")],
+                extra: toWei("40"), // t = 30 * 0.2 = 6, +e = 20 - 6
+                base: toWei("32"), // + 40 * 0.2 = 6
+                rounds: [toWei("20"), toWei("0")] // 30 * 0.5
+            },
+            {
+                capture: [160, toWei("50")],
+                extra: toWei("40"), // t = 10 * 0.2 = 2, +e = 0
+                base: toWei("25"), // + 40 * 0.2 = 6
+                rounds: [toWei("25"), toWei("2")] // 30 * 0.5
+            },
+            {
+                capture: [1400109, toWei("10000000")],
+                extra: toWei("9720000.2"), // t = 1399949 * 0.2 = 280001.8, +e = 9999950 - 279989.8
+                rounds: [toWei("699999.5"), toWei("200000")] // 30 * 0.5
+            },
+            {
+                capture: [1400110, toWei("10000000")],
+                rounds: [toWei("700000"), toWei("200000")] // 30 * 0.5
+            },
+            {
+                capture: [1401110, toWei("11000000")],
+                rounds: [toWei("700000"), toWei("200000")] // 30 * 0.5
+            },
+        ])
     })
 
-
-    it("mockcase - series-a mint all", async () => {
-        const mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
-        const dataExchange = await createContract("MockDataExchange");
-
-        const minter = await createContract("TestMinter", [
-            mcb.address,
-            dataExchange.address,
-            seriesA.address,
+    it("round mint - more rounds | non-static", async () => {
+        await minter.setBlockNumber(1) // < 100
+        // round - 0
+        await minter.newRound(
             user2.address,
-            toWei("5"),
-            toWei("5"),
+            toWei("700000"),
+            toWei("0.5"),
+            110,
+        )
+        // round - 1
+        await minter.newRound(
+            user2.address,
+            toWei("200000"),
             toWei("0.2"),
-            toWei("0.3"),
-        ]);
-        await mcb.grantRole(await mcb.MINTER_ROLE(), minter.address);
-
-        await minter.setBlockNumber(0)
-        expect(await minter.callStatic.getSeriesAMintableAmount()).to.equal(toWei("0"))
-        expect(await minter.callStatic.getBaseMintableAmount()).to.equal(toWei("0"))
-
-        await dataExchange.setTotalCapturedUSD(toWei("6.5"), 1);
-        await minter.setBlockNumber(2)
-        await minter.updateMintableAmount();
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0.6")) // max(0.3 * 2, extra)
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("5")) // 0.2 * 2 + 0.7
-        expect(await minter.extraMintableAmount()).to.equal(toWei("5.7"))  // 6.5 - 0.2 - 0.6
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0.4"))  // 1.5 - 0.2 * 1 - 0.6
-
-        await minter.setBlockNumber(20)
-        await minter.updateSeriesAMintableAmount();
-
-        // base not updated
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("5")) // max(0.3 * 2, extra)
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("1.7"))  //
-        expect(await minter.extraMintableAmount()).to.equal(toWei("1.3"))  //
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0.4"))  // 20 * 0.2
-
-        await minter.updateMintableAmount();
-
-        // base not updated
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("5")) // max(0.3 * 2, extra)
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("5"))  //
-        expect(await minter.extraMintableAmount()).to.equal(toWei("1.3"))  //
-        expect(await minter.baseMintableAmount()).to.equal(toWei("4"))  // 20 * 0.2
-
-        await minter.testSeriesAMint(user2.address, toWei("5"))
-        await minter.testBaseMint(user2.address, toWei("5"))
-
-        await expect(minter.testSeriesAMint(user2.address, toWei("1"))).to.be.revertedWith("exceeds max")
-        await expect(minter.testBaseMint(user2.address, toWei("1"))).to.be.revertedWith("exceeds max")
-
-        await dataExchange.setTotalCapturedUSD(toWei("7.5"), 2);
-        await minter.setBlockNumber(21)
-        await minter.updateMintableAmount();
-
-        expect(await minter.getSeriesAMintableAmount()).to.equal(toWei("0")) // max(0.3 * 2, extra)
-        expect(await minter.getBaseMintableAmount()).to.equal(toWei("0"))  //
-        expect(await minter.extraMintableAmount()).to.equal(toWei("1.1"))  // 0.3 + 0.8
-        expect(await minter.baseMintableAmount()).to.equal(toWei("0.2"))  // 20 * 0.2
+            150,
+        )
+        await caseTester({ minter, valueCapture }, [
+            {
+                base: 0,
+                extra: 0,
+                rounds: [0]
+            },
+            {
+                block: 110,
+                base: toWei("2"),
+                extra: 0,
+                rounds: [0]
+            },
+            {
+                capture: [110, toWei("20")],
+                extra: toWei("18"),
+                base: toWei("20"),
+                rounds: [0]
+            },
+            ///////////////////////
+            {
+                block: 120,
+                capture: [120, toWei("30")],
+                extra: toWei("21"),
+                base: toWei("25"),
+                rounds: [toWei("5"), toWei("0")]
+            },
+            ///////////////////////
+            {
+                block: 160,
+                extra: toWei("21"),
+                base: toWei("33"), // + 40 * 0.2
+                rounds: [toWei("5"), toWei("0")]
+            },
+            {
+                capture: [150, toWei("50")],
+                extra: toWei("20"), // 21 + 20 - 30 * 0.2 = 41 - 6 = 35 //
+                base: toWei("32"),
+                rounds: [toWei("20"), toWei("0")] // 30 * 0.5
+            },
+            {
+                capture: [160, toWei("50")],
+                extra: toWei("13"), // 20 -5 -2
+                base: toWei("25"), // + 40 * 0.2 = 6
+                rounds: [toWei("25"), toWei("2")] // 30 * 0.5
+            },
+            {
+                capture: [1400109, toWei("10000000")],
+                rounds: [toWei("699999.5"), toWei("200000")] // 30 * 0.5
+            },
+            {
+                capture: [1400110, toWei("10000000")],
+                rounds: [toWei("700000"), toWei("200000")] // 30 * 0.5
+            },
+            {
+                capture: [1401110, toWei("11000000")],
+                rounds: [toWei("700000"), toWei("200000")] // 30 * 0.5
+            },
+        ], true)
     })
-
 })

@@ -5,7 +5,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-import "./interfaces/IAuthenticator.sol";
+import "../interfaces/IAuthenticator.sol";
 
 /**
  * @notice  ExecutionProxy is a proxy that can forward transaction with authentication.
