@@ -8,6 +8,10 @@ import "hardhat-contract-sizer";
 import "solidity-coverage"
 // import "hardhat-dependency-compiler"
 
+const pk = process.env["PK"]
+const infuraId = process.env["INFURA_ID"]
+
+
 task("accounts", "Prints the list of accounts", async (args, hre) => {
     const accounts = await hre.ethers.getSigners();
 
@@ -97,34 +101,52 @@ module.exports = {
         hardhat: {
             // loggingEnabled: true
         },
-        arb5: {
-            url: "https://kovan5.arbitrum.io/rpc",
+        arb: {
+            url: `https://rinkeby.arbitrum.io/rpc`,
             gasPrice: 6e8,
             blockGasLimit: "80000000",
-            accounts: ["b49bdc31d49ece2ee667de5c0b378ce193af4153c554db624db71696911ac6c6"],
-            urlL1: "https://kovan.infura.io/v3/3582010d3cc14ab183653e5861d0c118",
+            accounts: [pk],
+            urlL1: `https://rinkeby.infura.io/v3/${infuraId}`,
         },
         s10: {
             url: "http://server10.jy.mcarlo.com:8747",
             gasPrice: "auto",
             blockGasLimit: "8000000"
         },
-        kovan: {
-            url: "https://kovan.infura.io/v3/3582010d3cc14ab183653e5861d0c118",
+        rinkeby: {
+            url: `https://kovan.infura.io/v3/${infuraId}`,
             gasPrice: 1e9,
-            accounts: ["0xd961926e05ae51949465139b95d91faf028de329278fa5db7462076dd4a245f4"],
+            accounts: [pk],
             timeout: 300000,
             confirmations: 1,
         },
     },
     solidity: {
-        version: "0.7.4",
-        settings: {
-            optimizer: {
-                enabled: true,
-                runs: 200
+        compilers: [
+            {
+                version: "0.7.4",
+                settings: {
+                    optimizer: {
+                        enabled: true,
+                        runs: 200
+                    }
+                }
+            },
+            {
+                version: "0.7.6",
+                settings: {
+                    optimizer: {
+                        enabled: true,
+                        runs: 200
+                    }
+                }
             }
-        }
+        ],
+        // overrides: {
+        //     "contracts/exchange/UniV3Wrapper.sol": {
+        //         version: "0.7.6",
+        //     }
+        // }
     },
     paths: {
         sources: "./contracts",

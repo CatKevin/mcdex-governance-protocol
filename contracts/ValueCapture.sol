@@ -232,7 +232,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
         nonReentrant
     {
         require(vault != address(0), "vault is not set");
-        IERC20Upgradeable(token).safeTransferFrom(address(this), vault, tokenID);
+        IERC721Upgradeable(token).safeTransferFrom(address(this), vault, tokenID);
         emit ForwardERC721Token(token, tokenID);
     }
 
@@ -244,7 +244,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
         (address tokenOut, uint256 amountOut) = _exchangeTokenForUSD(token, amountIn);
         require(_usdTokenList.contains(tokenOut), "unexpected out token");
 
-        // transfer token to vault && add up the conveted amount
+        // transfer token to vault && add up the converted amount
         uint256 normalizer = normalizers[tokenOut];
         require(normalizer != 0, "unexpected normalizer");
 

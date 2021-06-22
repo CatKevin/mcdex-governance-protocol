@@ -44,7 +44,7 @@ abstract contract Distribution is Initializable, Context, Config {
         uint256 capturedValue,
         uint256 extraMintableAmount
     );
-    event UpdateSeriesAMintableAmount(
+    event UpdateRoundMintableAmount(
         uint256 lastUpdateBlock,
         uint256 currentBlock,
         uint256 seriesAMintableAmount,
@@ -115,6 +115,7 @@ abstract contract Distribution is Initializable, Context, Config {
         require(_remainingSupply() >= maxSupply, "insufficient supply for new round");
         require(rateLimitPerBlock > 0, "rateLimitPerBlock is zero");
         require(startBlock > _blockNumber(), "startBlock should be later than current");
+
         uint256 index = roundMintStates.length;
         Round memory newRound =
             Round({
@@ -126,6 +127,7 @@ abstract contract Distribution is Initializable, Context, Config {
                 mintedAmount: 0
             });
         roundMintStates.push(newRound);
+        baseMintState.maxSupply = _safe128(uint256(baseMintState.maxSupply).sub(maxSupply));
         emit NewRound(index, maxSupply, rateLimitPerBlock, startBlock);
     }
 
@@ -224,7 +226,7 @@ abstract contract Distribution is Initializable, Context, Config {
         extraMintableAmount = extraMintableAmount.sub(mintableAmount);
         // update amount && block
         round.mintableAmount = _safe128(mintableAmount.add(round.mintableAmount));
-        emit UpdateSeriesAMintableAmount(
+        emit UpdateRoundMintableAmount(
             round.lastUpdateBlock,
             lastCapturedBlock,
             round.mintableAmount,

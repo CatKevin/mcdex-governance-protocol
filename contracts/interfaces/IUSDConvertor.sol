@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.7.4;
+pragma solidity >=0.7.4;
 
 interface IUSDConvertor {
     function tokenIn() external view returns (address);

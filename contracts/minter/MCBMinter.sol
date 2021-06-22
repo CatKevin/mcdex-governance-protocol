@@ -139,8 +139,8 @@ contract MCBMinter is
      * @notice  Update captured USD value. Only can be called by the sender who is granted
      *          VALUE_CAPTURE_ROLE role by authenticator.
      *          Calls in the same block will be ignored.
-     * @param totalCapturedUSD  CapturedUSD value, represented with a fix-float of decimals 18.
-     * @param lastCapturedBlock The blockNumber captured last time.
+     * @param   totalCapturedUSD    CapturedUSD value, represented with a fix-float of decimals 18.
+     * @param   lastCapturedBlock   The blockNumber captured last time.
      */
     function onValueCaptured(uint256 totalCapturedUSD, uint256 lastCapturedBlock) external {
         require(
