@@ -10,9 +10,7 @@ export async function deploy(deployer, accounts) {
 
     const owner = accounts[0]
 
-    await deployer.deploy("ProxyAdmin")
-    await deployer.deploy("MCB", "fakeMCB", "fakeMCB", 18);
-
+    await deployer.deployOrSkip("ProxyAdmin")
     await deployer.deployAsUpgradeable("Authenticator", deployer.addressOf("ProxyAdmin"))
     await deployer.deployAsUpgradeable("XMCB", deployer.addressOf("ProxyAdmin"));
     await deployer.deployAsUpgradeable("Timelock", deployer.addressOf("ProxyAdmin"));

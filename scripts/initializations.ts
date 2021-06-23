@@ -52,8 +52,6 @@ export async function initialize(deployer, accounts) {
 
     const developer = accounts[0]
     const admin = accounts[0]
-    const seriesAVesting = "0x6766F3CFD606E1E428747D3364baE65B6f914D56"
-
 
     const mcb = await deployer.getDeployedContract("MCB")
     const authenticator = await deployer.getDeployedContract("Authenticator")
@@ -89,17 +87,17 @@ export async function initialize(deployer, accounts) {
         authenticator.address,
         mcb.address,
         developer.address,
-        1000,
-        0,
+        8506173,
+        "1100001000000000000000000", // 1100001000000000000000000 L1 + L2
         toWei("0.2"),
     ));
 
-    const bn = await blockNumber()
+    // const bn = await blockNumber()
     await ensureFinished(mcbMinter.newRound(
-        seriesAVesting,
+        deployer.addressOf("MCBVesting"),
         toWei("700000"),
         toWei("0.55392"),
-        bn + 10,
+        8812559,
     ));
     printInfo("mcbMinter initialzation done")
 
@@ -121,6 +119,12 @@ export async function initialize(deployer, accounts) {
         ));
     printInfo("timelock && governor initialzation done")
 
+    await ensureFinished(
+        authenticator.grantRole(
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            timelock.address
+        ));
+    printInfo("MCB MINTER_ROLE initialzation done")
 }
 
 
