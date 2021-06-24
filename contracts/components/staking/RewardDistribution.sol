@@ -2,21 +2,21 @@
 pragma solidity 0.7.4;
 
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
 import "../../interfaces/IAuthenticator.sol";
 
-interface IXMCB is IERC20Upgradeable {
+interface IXMCB {
     function rawTotalSupply() external view returns (uint256);
 
     function rawBalanceOf(address account) external view returns (uint256);
 }
 
-contract RewardDistribution is OwnableUpgradeable {
+contract RewardDistribution is Initializable {
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -66,8 +66,6 @@ contract RewardDistribution is OwnableUpgradeable {
     function initialize(address authenticator_, address XMCB_) external initializer {
         require(authenticator_.isContract(), "authenticator must be a contract");
         require(XMCB_.isContract(), "authenticator must be a contract");
-
-        __Ownable_init();
 
         authenticator = IAuthenticator(authenticator_);
         xmcb = IXMCB(XMCB_);
@@ -166,11 +164,11 @@ contract RewardDistribution is OwnableUpgradeable {
             plan.periodFinish = _getBlockNumber();
         } else if (plan.periodFinish != 0) {
             plan.periodFinish = plan
-                .periodFinish
-                .sub(plan.lastUpdateTime)
-                .mul(plan.rewardRate)
-                .div(newRewardRate)
-                .add(_getBlockNumber());
+            .periodFinish
+            .sub(plan.lastUpdateTime)
+            .mul(plan.rewardRate)
+            .div(newRewardRate)
+            .add(_getBlockNumber());
         }
         emit RewardRateChanged(plan.rewardRate, newRewardRate, plan.periodFinish);
         plan.rewardRate = newRewardRate;
@@ -248,9 +246,9 @@ contract RewardDistribution is OwnableUpgradeable {
     /**
      * @notice  Claim remaining reward of a token for caller.
      */
-    function getReward(address token) public updateReward(token, _msgSender()) {
+    function getReward(address token) public updateReward(token, msg.sender) {
         RewardPlan storage plan = _rewardPlans[token];
-        address account = _msgSender();
+        address account = msg.sender;
         uint256 reward = earned(token, account);
         if (reward > 0) {
             plan.rewards[account] = 0;

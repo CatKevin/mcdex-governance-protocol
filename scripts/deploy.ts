@@ -10,7 +10,6 @@ const ENV: DeploymentOptions = {
     artifactDirectory: './artifacts/contracts',
     addressOverride: {
         // arb-rinkeby
-        "MCB": "0xE495e9bC15cBAD2E2E957D278749Fb07B8a98fDe",
         "MCBVesting": "0x49FCebBc49Fc617b901E4086dEfB8Cc016a4BD17",
         "ProxyAdmin": "0xA712f0D80Fc1066a73649D004e3E0D92150ae1f6",
     }
