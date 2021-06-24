@@ -16,7 +16,7 @@ contract UniV3Wrapper is IUSDConvertor {
     address public factory;
 
     function initialize(bytes memory path_) external {
-        require(path_.length == 0, "already initialized");
+        require(path.length == 0, "already initialized");
         path = path_;
         factory = msg.sender;
     }

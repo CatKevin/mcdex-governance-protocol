@@ -61,7 +61,7 @@ contract UniV3WrapperFactory is Ownable, IBeacon {
         return wrappers[_digest(path_)] == address(0);
     }
 
-    function _digest(bytes memory path_) internal view returns (bytes32) {
+    function _digest(bytes memory path_) internal pure returns (bytes32) {
         return keccak256(path_);
     }
 }
