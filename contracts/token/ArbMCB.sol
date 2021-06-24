@@ -32,7 +32,7 @@ contract ArbMCB is ERC20PresetMinterPauserUpgradeable, L2ArbitrumMessenger, IArb
 
     event BridgeMint(address indexed account, uint256 amount);
     event BridgeBurn(address indexed account, uint256 amount);
-    event L1EscrowMint(address indexed l1Token, uint256 amount);
+    event L1EscrowMint(address indexed l1Token, uint256 indexed withdrawalId, uint256 amount);
 
     function initialize(
         string memory name_,
@@ -86,8 +86,8 @@ contract ArbMCB is ERC20PresetMinterPauserUpgradeable, L2ArbitrumMessenger, IArb
         require(hasRole(MINTER_ROLE, _msgSender()), "must have minter role to mint");
         _mint(to, amount);
         // mint to gateway on L1
-        sendTxToL1(0, address(this), l1Token, _getOutboundCalldata(amount));
-        emit L1EscrowMint(l1Token, amount);
+        uint256 id = sendTxToL1(0, address(this), l1Token, _getOutboundCalldata(amount));
+        emit L1EscrowMint(l1Token, id, amount);
     }
 
     function _getOutboundCalldata(uint256 amount) internal pure virtual returns (bytes memory) {

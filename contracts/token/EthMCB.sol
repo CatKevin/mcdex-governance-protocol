@@ -32,8 +32,12 @@ contract EthMCB is ERC20PresetMinterPauserUpgradeable {
         string memory name_,
         string memory symbol_,
         address gateway_,
-        address l2Token_
-    ) external initializer {
+        address l2Token_,
+        uint256 maxSubmissionCost1,
+        uint256 maxSubmissionCost2,
+        uint256 maxGas,
+        uint256 gasPriceBid
+    ) external payable initializer {
         require(gateway_.isContract(), "gateway must be contract");
         require(l2Token_ != address(0), "l1Token must be non-zero address");
 
@@ -41,6 +45,32 @@ contract EthMCB is ERC20PresetMinterPauserUpgradeable {
 
         gateway = gateway_;
         l2Token = l2Token_;
+
+        uint256 gas1 = maxSubmissionCost1 + maxGas * gasPriceBid;
+        uint256 gas2 = maxSubmissionCost2 + maxGas * gasPriceBid;
+        require(msg.value == gas1 + gas2, "overpay");
+
+        // register token address to paring with arb-token.
+        bytes memory functionCallData1 = abi.encodeWithSignature(
+            "registerTokenToL2(address,uint256,uint256,uint256)",
+            l2Token,
+            maxGas,
+            gasPriceBid,
+            maxSubmissionCost1
+        );
+        gateway.functionCallWithValue(functionCallData1, gas1);
+        emit RegisterTokenOnL2(gateway, l2Token, maxGas, gasPriceBid, maxSubmissionCost1);
+
+        // register token to gateway.
+        bytes memory functionCallData2 = abi.encodeWithSignature(
+            "setGateway(address,uint256,uint256,uint256)",
+            gateway,
+            maxGas,
+            gasPriceBid,
+            maxSubmissionCost2
+        );
+        ITokenGateway(gateway).router().functionCallWithValue(functionCallData2, gas2);
+        emit SetGateway(gateway, maxGas, gasPriceBid, maxSubmissionCost2);
     }
 
     /**
@@ -51,44 +81,6 @@ contract EthMCB is ERC20PresetMinterPauserUpgradeable {
         require(msgSender == l2Token, "sender must be l2 token");
         _mint(gateway, amount);
         emit EscrowMint(msgSender, amount);
-    }
-
-    /**
-     * @notice Register token address to paring with arb-token.
-     */
-    function registerTokenOnL2(
-        uint256 maxSubmissionCost,
-        uint256 maxGas,
-        uint256 gasPriceBid
-    ) external payable {
-        bytes memory functionCallData = abi.encodeWithSignature(
-            "registerTokenToL2(address,uint256,uint256,uint256)",
-            l2Token,
-            maxGas,
-            gasPriceBid,
-            maxSubmissionCost
-        );
-        gateway.functionCallWithValue(functionCallData, msg.value);
-        emit RegisterTokenOnL2(gateway, l2Token, maxGas, gasPriceBid, maxSubmissionCost);
-    }
-
-    /**
-     * @notice Register token to gateway.
-     */
-    function setGateway(
-        uint256 maxSubmissionCost,
-        uint256 maxGas,
-        uint256 gasPriceBid
-    ) external payable {
-        bytes memory functionCallData = abi.encodeWithSignature(
-            "setGateway(address,uint256,uint256,uint256)",
-            gateway,
-            maxGas,
-            gasPriceBid,
-            maxSubmissionCost
-        );
-        ITokenGateway(gateway).router().functionCallWithValue(functionCallData, msg.value);
-        emit SetGateway(gateway, maxGas, gasPriceBid, maxSubmissionCost);
     }
 
     function _l2Sender() internal view virtual returns (address) {
