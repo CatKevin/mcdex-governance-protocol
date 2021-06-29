@@ -40,7 +40,7 @@ contract Timelock is Initializable, ITimelock {
     );
 
     uint256 public constant override GRACE_PERIOD = 3 days;
-    uint256 public constant MINIMUM_DELAY = 0 days;
+    uint256 public constant MINIMUM_DELAY = 1 days;
     uint256 public constant MAXIMUM_DELAY = 30 days;
 
     address public admin;

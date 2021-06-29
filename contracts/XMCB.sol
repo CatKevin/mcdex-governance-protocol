@@ -33,7 +33,7 @@ contract XMCB is
 
     uint96 internal _rawTotalSupply;
 
-    event Depoist(address indexed account, uint256 amount);
+    event Deposit(address indexed account, uint256 amount);
     event Withdraw(address indexed account, uint256 amount, uint256 penalty);
     event SetWithdrawalPenaltyRate(uint256 previousPenaltyRate, uint256 newPenaltyRate);
 
@@ -49,8 +49,8 @@ contract XMCB is
      * @notice  initialize XMCB token.
      * @param   authenticator_          Owner of XMCB who is able to set withdraw penalty rate.
      * @param   rawToken_               The token used as collateral for XMCB.
-     * @param   withdrawalPenaltyRate_  The penalty rate when user withdaw.
-     *                                  The deducted part will be added to all remining holders.
+     * @param   withdrawalPenaltyRate_  The penalty rate when user withdraw.
+     *                                  The deducted part will be added to all remaining holders.
      */
     function initialize(
         address authenticator_,
@@ -121,7 +121,7 @@ contract XMCB is
     }
 
     /**
-     * @notice  Exchange an equal amount of XMCB for `rawToken`. A withrawal penalty will be applied on the amount.
+     * @notice  Exchange an equal amount of XMCB for `rawToken`. A withdrawal penalty will be applied on the amount.
      *          User is expected to get `amount * (1 - withdrawalPenaltyRate)` token back.
      * @param   amount  The amount of `rawToken` to withdraw.
      */
@@ -158,7 +158,7 @@ contract XMCB is
             safe96(amount, "XMCB::_deposit: amount exceeds 96 bits"),
             "XMCB::_deposit: deposit amount overflows"
         );
-        emit Depoist(account, amount);
+        emit Deposit(account, amount);
     }
 
     function _withdraw(address account, uint256 amount) internal virtual {

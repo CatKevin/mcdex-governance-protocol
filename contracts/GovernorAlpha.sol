@@ -10,7 +10,7 @@ import { ITimelock } from "./interfaces/ITimelock.sol";
 
 contract GovernorAlpha is Initializable {
     /// @notice The name of this contract
-    string public constant name = "MCDEX DAO Governor Alpha";
+    string public constant name = "MCDEX DAO Governor";
 
     // 10,000,000;
 
@@ -95,7 +95,16 @@ contract GovernorAlpha is Initializable {
     }
 
     /// @notice Possible states that a proposal may be in
-    enum ProposalState { Pending, Active, Canceled, Defeated, Succeeded, Queued, Expired, Executed }
+    enum ProposalState {
+        Pending,
+        Active,
+        Canceled,
+        Defeated,
+        Succeeded,
+        Queued,
+        Expired,
+        Executed
+    }
 
     /// @notice The official record of all proposals ever proposed
     mapping(uint256 => Proposal) public proposals;
@@ -364,10 +373,9 @@ contract GovernorAlpha is Initializable {
         bytes32 r,
         bytes32 s
     ) public {
-        bytes32 domainSeparator =
-            keccak256(
-                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this))
-            );
+        bytes32 domainSeparator = keccak256(
+            abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), _getChainId(), address(this))
+        );
         bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         address signatory = ecrecover(digest, v, r, s);

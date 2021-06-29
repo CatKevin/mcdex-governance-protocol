@@ -37,7 +37,7 @@ contract Vault is Initializable, ERC721HolderUpgradeable, ReentrancyGuardUpgrade
     }
 
     /**
-     * @notice  Initialzie vault contract.
+     * @notice  Initialize vault contract.
      *
      * @param   authenticator_  The address of authentication controller that can determine who is able to call
      *                          admin interfaces.
@@ -104,7 +104,7 @@ contract Vault is Initializable, ERC721HolderUpgradeable, ReentrancyGuardUpgrade
      *
      * @param   to      The target address which the transaction is to send to.
      * @param   data    A bytes array contains calldata.
-     * @param   value   The value of ethers to be sent with the transation.
+     * @param   value   The value of ethers to be sent with the transaction.
      */
     function execute(
         address to,
