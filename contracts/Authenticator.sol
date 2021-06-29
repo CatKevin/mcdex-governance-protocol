@@ -5,9 +5,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
 
-import { IAuthenticator } from "./interfaces/IAuthenticator.sol";
-
-contract Authenticator is Initializable, AccessControlUpgradeable, IAuthenticator {
+contract Authenticator is Initializable, AccessControlUpgradeable {
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     /**
@@ -20,23 +18,13 @@ contract Authenticator is Initializable, AccessControlUpgradeable, IAuthenticato
     }
 
     /**
-     * @notice  Check if an account has the given role.
-     * @param   role    A bytes32 value generated from keccak256("ROLE_NAME").
-     * @param   account The account to be checked.
-     * @return  True if the account has already granted permissions for the given role.
-     */
-    function hasRole(bytes32 role, address account) external view override returns (bool) {
-        return AccessControlUpgradeable.hasRole(role, account);
-    }
-
-    /**
      * @notice  This should be called from external contract, to test if a account has specified role.
 
      * @param   role    A bytes32 value generated from keccak256("ROLE_NAME").
      * @param   account The account to be checked.
      * @return  True if the account has already granted permissions for the given role.
      */
-    function hasRoleOrAdmin(bytes32 role, address account) external view override returns (bool) {
+    function hasRoleOrAdmin(bytes32 role, address account) external view returns (bool) {
         return hasRole(DEFAULT_ADMIN_ROLE, account) || hasRole(role, account);
     }
 
