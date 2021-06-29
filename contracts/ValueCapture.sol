@@ -13,12 +13,13 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import { ICaptureNotifyRecipient } from "./interfaces/ICaptureNotifyRecipient.sol";
 import { IUSDConvertor } from "./interfaces/IUSDConvertor.sol";
 import { IAuthenticator } from "./interfaces/IAuthenticator.sol";
+import { IValueCapture } from "./interfaces/IValueCapture.sol";
 
 interface IDecimals {
     function decimals() external view returns (uint8);
 }
 
-contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
+contract ValueCapture is Initializable, ReentrancyGuardUpgradeable, IValueCapture {
     using SafeMathUpgradeable for uint256;
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -30,8 +31,8 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
     IAuthenticator public authenticator;
     address public vault;
     address public captureNotifyRecipient;
-    uint256 public totalCapturedUSD;
-    uint256 public lastCapturedBlock;
+    uint256 public override totalCapturedUSD;
+    uint256 public override lastCapturedBlock;
 
     EnumerableSetUpgradeable.AddressSet internal _usdTokenList;
     mapping(address => uint256) public normalizers;
@@ -62,12 +63,12 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
         _;
     }
 
-    function getCapturedValue() public view returns (uint256, uint256) {
+    function getCapturedValue() external view override returns (uint256, uint256) {
         return (totalCapturedUSD, lastCapturedBlock);
     }
 
     /**
-     * @notice  Initialzie value capture contract.
+     * @notice  Initialize value capture contract.
      *
      * @param   authenticator_  The address of authenticator controller that can determine who is able to call
      *                          admin interfaces.
@@ -83,7 +84,10 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
         vault = vault_;
     }
 
-    function setCaptureNotifyRecipient(address newRecipient) external onlyAuthorized {
+    /**
+     * @notice Set receiver of value captured events.
+     */
+    function setCaptureNotifyRecipient(address newRecipient) external override onlyAuthorized {
         require(newRecipient != captureNotifyRecipient, "newRecipient is already set");
         emit SetMiner(captureNotifyRecipient, newRecipient);
         captureNotifyRecipient = newRecipient;
@@ -95,6 +99,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
     function listUSDTokens(uint256 begin, uint256 end)
         external
         view
+        override
         returns (address[] memory result)
     {
         require(end > begin, "begin should be lower than end");
@@ -118,7 +123,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
      * @param   token       The address of usd token to be put into whitelist.
      * @param   decimals    The decimals of token.
      */
-    function addUSDToken(address token, uint256 decimals) external onlyAuthorized {
+    function addUSDToken(address token, uint256 decimals) external override onlyAuthorized {
         require(!_usdTokenList.contains(token), "token already in usd list");
         require(token.isContract(), "token address must be contract");
         require(decimals <= 18, "decimals out of range");
@@ -139,7 +144,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
      *
      * @param   token   The address of USD token to remove.
      */
-    function removeUSDToken(address token) external onlyAuthorized {
+    function removeUSDToken(address token) external override onlyAuthorized {
         require(_usdTokenList.contains(token), "token not in usd list");
 
         bool isRemoved = _usdTokenList.remove(token);
@@ -158,7 +163,11 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
      * @param   token               The address of any token accepted by exchange.
      * @param   exchange_          The address of exchange contract.
      */
-    function setExternalExchange(address token, address exchange_) external onlyAuthorized {
+    function setExternalExchange(address token, address exchange_)
+        external
+        override
+        onlyAuthorized
+    {
         require(exchange_.isContract(), "exchange must be a contract");
         IUSDConvertor exchange = IUSDConvertor(exchange_);
         require(token == exchange.tokenIn(), "input token mismatch");
@@ -168,17 +177,6 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
         emit SetConvertor(token, exchange_);
     }
 
-    // /**
-    //  * @notice  Exchange the all the given token stored in contract for USD token, then forward the USD token to vault.
-    //  *
-    //  * @param   token       The address of token to forward to vault.
-    //  * @param   amountIn    The amount to (exchange for USD and) forward to vault.
-    //  */
-    // function forwardAsset(address token, uint256 amountIn) external nonReentrant onlyAuthorized {
-    //     _forwardAsset(token, amountIn);
-    //     tryNotifyCapturedValue();
-    // }
-
     /**
      * @notice  Batch version of forwardAsset.
      *
@@ -187,6 +185,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
      */
     function forwardMultiAssets(address[] memory tokens, uint256[] memory amountsIn)
         external
+        override
         nonReentrant
         onlyAuthorized
     {
@@ -202,7 +201,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
      *
      *          *Asset sent though this method to vault will not affect mintable amount of MCB.*
      */
-    function forwardETH(uint256 amount) external onlyAuthorized nonReentrant {
+    function forwardETH(uint256 amount) external override onlyAuthorized nonReentrant {
         require(vault != address(0), "vault is not set");
         AddressUpgradeable.sendValue(payable(vault), amount);
         emit ForwardETH(amount);
@@ -215,7 +214,12 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
      *
      *          *Asset sent though this method to vault will not affect mintable amount of MCB.*
      */
-    function forwardERC20Token(address token, uint256 amount) external onlyAuthorized nonReentrant {
+    function forwardERC20Token(address token, uint256 amount)
+        external
+        override
+        onlyAuthorized
+        nonReentrant
+    {
         require(vault != address(0), "vault is not set");
         IERC20Upgradeable(token).safeTransfer(vault, amount);
         emit ForwardERC20Token(token, amount);
@@ -228,6 +232,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
      */
     function forwardERC721Token(address token, uint256 tokenID)
         external
+        override
         onlyAuthorized
         nonReentrant
     {
@@ -262,7 +267,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable {
         returns (address tokenOut, uint256 amountOut)
     {
         uint256 tokenInBalance = IERC20Upgradeable(tokenIn).balanceOf(address(this));
-        require(amountIn <= tokenInBalance, "amount in execceds convertable amount");
+        require(amountIn <= tokenInBalance, "amount in exceeds convertable amount");
         if (amountIn == 0) {
             // early revert
             revert("no balance to convert");

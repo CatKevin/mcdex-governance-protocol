@@ -8,7 +8,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import { IAuthenticator } from "../interfaces/IAuthenticator.sol";
-
+import { ICaptureNotifyRecipient } from "../interfaces/ICaptureNotifyRecipient.sol";
 import { Config } from "./Config.sol";
 import { Context } from "./Context.sol";
 import { Distribution } from "./Distribution.sol";
@@ -20,7 +20,8 @@ contract MCBMinter is
     Config,
     Distribution,
     Minter,
-    ReentrancyGuardUpgradeable
+    ReentrancyGuardUpgradeable,
+    ICaptureNotifyRecipient
 {
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
@@ -142,7 +143,10 @@ contract MCBMinter is
      * @param   totalCapturedUSD    CapturedUSD value, represented with a fix-float of decimals 18.
      * @param   lastCapturedBlock   The blockNumber captured last time.
      */
-    function onValueCaptured(uint256 totalCapturedUSD, uint256 lastCapturedBlock) external {
+    function onValueCaptured(uint256 totalCapturedUSD, uint256 lastCapturedBlock)
+        external
+        override
+    {
         require(
             authenticator.hasRole(VALUE_CAPTURE_ROLE, msg.sender),
             "caller is not valueCapture"

@@ -142,11 +142,6 @@ module.exports = {
                 }
             }
         ],
-        // overrides: {
-        //     "contracts/exchange/UniV3Wrapper.sol": {
-        //         version: "0.7.6",
-        //     }
-        // }
     },
     paths: {
         sources: "./contracts",

@@ -5,7 +5,9 @@ import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-contract Timelock is Initializable {
+import { ITimelock } from "./interfaces/ITimelock.sol";
+
+contract Timelock is Initializable, ITimelock {
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
 
@@ -37,15 +39,15 @@ contract Timelock is Initializable {
         uint256 eta
     );
 
-    uint256 public constant GRACE_PERIOD = 3 days;
+    uint256 public constant override GRACE_PERIOD = 3 days;
     uint256 public constant MINIMUM_DELAY = 0 days;
     uint256 public constant MAXIMUM_DELAY = 30 days;
 
     address public admin;
     address public pendingAdmin;
-    uint256 public delay;
+    uint256 public override delay;
 
-    mapping(bytes32 => bool) public queuedTransactions;
+    mapping(bytes32 => bool) public override queuedTransactions;
 
     function initialize(address admin_, uint256 delay_) external initializer {
         require(delay_ >= MINIMUM_DELAY, "Delay must exceed minimum delay.");
@@ -66,7 +68,7 @@ contract Timelock is Initializable {
         emit NewDelay(delay);
     }
 
-    function acceptAdmin() public {
+    function acceptAdmin() public override {
         require(msg.sender == pendingAdmin, "Call must come from pendingAdmin.");
         admin = msg.sender;
         pendingAdmin = address(0);
@@ -87,7 +89,7 @@ contract Timelock is Initializable {
         string memory signature,
         bytes memory data,
         uint256 eta
-    ) public returns (bytes32) {
+    ) public override returns (bytes32) {
         require(msg.sender == admin, "Call must come from admin.");
         require(
             eta >= getBlockTimestamp().add(delay),
@@ -107,7 +109,7 @@ contract Timelock is Initializable {
         string memory signature,
         bytes memory data,
         uint256 eta
-    ) public {
+    ) public override {
         require(msg.sender == admin, "Call must come from admin.");
 
         bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
@@ -122,7 +124,7 @@ contract Timelock is Initializable {
         string memory signature,
         bytes memory data,
         uint256 eta
-    ) public payable returns (bytes memory) {
+    ) public payable override returns (bytes memory) {
         require(msg.sender == admin, "Call must come from admin.");
 
         bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));

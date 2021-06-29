@@ -8,7 +8,8 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol
 import "@openzeppelin/contracts-upgradeable/utils/EnumerableSetUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-import "../../interfaces/IAuthenticator.sol";
+import { IAuthenticator } from "../../interfaces/IAuthenticator.sol";
+import { IComponent } from "../../interfaces/IComponent.sol";
 
 interface IXMCB {
     function rawTotalSupply() external view returns (uint256);
@@ -16,7 +17,7 @@ interface IXMCB {
     function rawBalanceOf(address account) external view returns (uint256);
 }
 
-contract RewardDistribution is Initializable {
+contract RewardDistribution is Initializable, IComponent {
     using AddressUpgradeable for address;
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -74,7 +75,7 @@ contract RewardDistribution is Initializable {
     /**
      * @notice  The address of base token.
      */
-    function baseToken() external view returns (address) {
+    function baseToken() external view override returns (address) {
         return address(xmcb);
     }
 
@@ -85,7 +86,7 @@ contract RewardDistribution is Initializable {
         address account,
         uint256,
         uint256
-    ) external {
+    ) external override {
         uint256 length = _activeReward.length();
         for (uint256 i = 0; i < length; i++) {
             _updateReward(_activeReward.at(i), account);
@@ -99,7 +100,7 @@ contract RewardDistribution is Initializable {
         address account,
         uint256,
         uint256
-    ) external {
+    ) external override {
         uint256 length = _activeReward.length();
         for (uint256 i = 0; i < length; i++) {
             _updateReward(_activeReward.at(i), account);
