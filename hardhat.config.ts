@@ -101,7 +101,7 @@ module.exports = {
         hardhat: {
             // loggingEnabled: true
         },
-        arb: {
+        arbrinkeby: {
             url: `https://rinkeby.arbitrum.io/rpc`,
             gasPrice: 6e8,
             blockGasLimit: "80000000",
@@ -114,7 +114,7 @@ module.exports = {
             blockGasLimit: "8000000"
         },
         rinkeby: {
-            url: `https://kovan.infura.io/v3/${infuraId}`,
+            url: `https://rinkeby.infura.io/v3/${infuraId}`,
             gasPrice: 1e9,
             accounts: [pk],
             timeout: 300000,
