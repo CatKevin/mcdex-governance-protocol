@@ -1,182 +1,211 @@
 import { expect } from "chai";
 const { ethers } = require("hardhat");
-import {
-    toWei,
-    fromWei,
-    toBytes32,
-    getAccounts,
-    createContract,
-} from '../scripts/utils';
+import { toWei, fromWei, getAccounts } from "../scripts/utils";
 
-describe('Integration', () => {
-    let accounts;
-    let user0;
-    let user1;
-    let user2;
-    let user3;
-    let seriesA;
-    let dev;
+import { Deployer } from "./TestDeployer";
 
-    let auth;
-    let mcb;
-    let xmcb;
-    let timelock;
-    let governor;
+describe("Integration", () => {
+  let accounts;
+  let user0;
+  let user1;
+  let user2;
+  let user3;
+  let developer;
+  let vesting;
 
-    enum ProposalState { Pending, Active, Canceled, Defeated, Succeeded, Queued, Expired, Executed }
+  let authenticator;
+  let mcb;
+  let xmcb;
+  let valueCapture;
+  let vault;
+  let rewardDistribution;
+  let mcbMinter;
+  let timelock;
+  let governor;
+  let admin;
+  let tm;
 
-    const fromState = (state) => {
-        return ProposalState[state]
-    }
+  const deployer = new Deployer();
 
-    before(async () => {
-        accounts = await getAccounts();
-        user0 = accounts[0];
-        user1 = accounts[1];
-        user2 = accounts[2];
-        user3 = accounts[3];
-        seriesA = accounts[4];
-        dev = accounts[5];
+  enum ProposalState {
+    Pending,
+    Active,
+    Canceled,
+    Defeated,
+    Succeeded,
+    Queued,
+    Expired,
+    Executed,
+  }
 
-        auth = await createContract("Authenticator");
-        await auth.initialize();
-        // mcb
-        mcb = await createContract("CustomERC20", ["MCB", "MCB", 18]);
-        // mcb
-        xmcb = await createContract("XMCB");
-        await xmcb.initialize(auth.address, mcb.address, toWei("0.05"))
+  const fromState = (state) => {
+    return ProposalState[state];
+  };
 
-        // timelock & governor
-        timelock = await createContract("TestTimelock", [user0.address, 86400]);
-        governor = await createContract("TestGovernorAlpha", [mcb.address, timelock.address, xmcb.address, user0.address]);
+  const blockTime = async () => {
+    return (await ethers.provider.getBlock()).timestamp;
+  };
 
-        var starttime = (await ethers.provider.getBlock()).timestamp;
-        await timelock.skipTime(0);
+  const blockNumber = async () => {
+    return (await ethers.provider.getBlock()).number;
+  };
 
-        const eta = starttime + 86400 + 1;
-        await timelock.queueTransaction(
-            timelock.address,
-            0,
-            "setPendingAdmin(address)",
-            ethers.utils.defaultAbiCoder.encode(["address"], [governor.address]),
-            eta
-        )
-        await timelock.skipTime(86400 + 1);
-        await timelock.executeTransaction(
-            timelock.address,
-            0,
-            "setPendingAdmin(address)",
-            ethers.utils.defaultAbiCoder.encode(["address"], [governor.address]),
-            eta
-        )
-        await governor.__acceptAdmin();
+  before(async () => {
+    accounts = await getAccounts();
+    admin = accounts[0];
+    user0 = accounts[0];
+    user1 = accounts[1];
+    user2 = accounts[2];
+    user3 = accounts[3];
+    developer = accounts[5];
+    vesting = accounts[9];
+  });
 
-        const vault = await createContract("Vault");
-        await vault.initialize(auth.address);
+  beforeEach(async () => {
+    mcb = await deployer.deploy("MCB", "MCB", "MCB", 18);
+    await mcb.mint(user1.address, toWei("2000000"));
 
-        const dataExchange = await createContract("DataExchange");
+    authenticator = await deployer.deploy("Authenticator");
+    vault = await deployer.deploy("Vault");
+    tm = await deployer.deploy("TimeMachine");
 
-        const valueCapture = await createContract("ValueCapture");
-        await valueCapture.initialize(auth.address, dataExchange.address, vault.address);
+    xmcb = await deployer.deploy("TestXMCB", tm.address);
+    valueCapture = await deployer.deploy("TestValueCapture", tm.address);
+    timelock = await deployer.deploy("TestTimelock", tm.address);
+    governor = await deployer.deploy("TestGovernorAlpha", tm.address);
+    rewardDistribution = await deployer.deploy("TestRewardDistribution", tm.address);
+    mcbMinter = await deployer.deploy("TestMCBMinter", tm.address);
 
-        await auth.grantRole("0x0000000000000000000000000000000000000000000000000000000000000000", timelock.address);
+    // initialize
+    await authenticator.initialize();
+    await xmcb.initialize(authenticator.address, mcb.address, toWei("0.05"));
+    await vault.initialize(authenticator.address);
 
-        // test in & out
-        // const tokenIn1 = await createContract("CustomERC20", ["TKN1", "TKN1", 18]);
-        // const tokenOu1 = await createContract("CustomERC20", ["USD1", "USD1", 18]);
+    await valueCapture.initialize(authenticator.address, vault.address);
+    await valueCapture.setCaptureNotifyRecipient(mcbMinter.address);
 
-        // converter
-        // const seller1 = await createContract("ConstantSeller", [tokenIn1.address, tokenOu1.address, toWei("4")])
-        // const oracle = await createContract("MockTWAPOracle");
-        // await oracle.setPrice(toWei("5"));
+    await rewardDistribution.initialize(authenticator.address, xmcb.address);
 
-        // await valueCapture.addUSDToken(tokenOu1.address, 18);
-        // await valueCapture.setConvertor(tokenIn1.address, oracle.address, seller1.address, toWei("0.01"));
+    await mcbMinter.initialize(
+      authenticator.address,
+      mcb.address,
+      developer.address,
+      800000,
+      await mcb.totalSupply(),
+      toWei("0.2")
+    );
+    await mcbMinter.newRound(vesting.address, toWei("700000"), toWei("0.55392"), 800000);
 
-        await timelock.setTimestamp(0)
-        await governor.setTimestamp(0)
+    await timelock.initialize(governor.address, 86400);
+    await governor.initialize(mcb.address, timelock.address, xmcb.address, admin.address, 23);
 
-        // mining
-        // const rewardDistrubution = await createContract("TestRewardDistribution", [user0.address, xmcb.address]);
-        // await xmcb.addComponent(rewardDistrubution.address);
+    // roles
+    await authenticator.grantRole(
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      timelock.address
+    );
+    await authenticator.grantRole(ethers.utils.id("VALUE_CAPTURE_ROLE"), valueCapture.address);
+    await mcb.grantRole(ethers.utils.id("MINTER_ROLE"), mcbMinter.address);
+  });
 
-        // await rewardDistrubution.createRewardPlan(mcb.address, toWei("0.2"));
-        // await rewardDistrubution.notifyRewardAmount(mcb.address, toWei("20000"));
+  it("forward && capture && mint", async () => {
+    await authenticator.grantRole(ethers.utils.id("VALUE_CAPTURE_ADMIN_ROLE"), user2.address);
 
-        const minter = await createContract("Minter", [
-            mcb.address,
-            valueCapture.address,
-            seriesA.address,
-            dev.address,
-            toWei("5000000"),
-            toWei("5000000"),
-            toWei("0.2"),
-            toWei("0.5"),
-        ]);
-    })
+    const usdc = await deployer.deploy("CustomERC20", "MCB", "MCB", 6);
+    const dai = await deployer.deploy("CustomERC20", "MCB", "MCB", 18);
+    await valueCapture.connect(user2).addUSDToken(usdc.address, 6);
+    await valueCapture.connect(user2).addUSDToken(dai.address, 18);
 
-    it("full case - mining", async () => {
-        // assume there are some mcb holder
-        await mcb.mint(user1.address, toWei("100"))
-        await mcb.mint(user2.address, toWei("150"))
-        await mcb.mint(user3.address, toWei("100"))
+    await usdc.mint(valueCapture.address, "1000000000"); // 1000 usdc
+    await dai.mint(valueCapture.address, toWei("540")); // 540 dai
 
-        // two of them staking there token for xmcb
-        await mcb.connect(user1).approve(xmcb.address, toWei("10000"));
-        await mcb.connect(user2).approve(xmcb.address, toWei("10000"));
-        await xmcb.connect(user1).deposit(toWei("75"));
-        await xmcb.connect(user2).deposit(toWei("25"));
+    await tm.turnOn();
+    await tm.setBlockNumber(801000);
 
-        // their balances should be ...
-        expect(await xmcb.balanceOf(user1.address)).to.equal(toWei("75"))
-        expect(await xmcb.balanceOf(user2.address)).to.equal(toWei("25"))
+    await valueCapture.forwardMultiAssets([usdc.address, dai.address], ["1000000000", toWei("540")]);
+    expect(await valueCapture.totalCapturedUSD()).to.equal(toWei("1540"));
+    expect(await valueCapture.totalCapturedUSD()).to.equal(await mcbMinter.lastCapturedValue());
+    expect(await valueCapture.lastCapturedBlock()).to.equal(await mcbMinter.lastCapturedBlock());
 
-        // they want to create a module to mining usd
-        const rewardDistrubution = await createContract("TestRewardDistribution", [auth.address, xmcb.address]);
-        // ** for test, I'll fix the block number here
-        await rewardDistrubution.setBlockNumber(1)
-        const xusd = await createContract("CustomERC20", ["xUSD", "xUSD", 6]);
-        // await rewardDistrubution.createRewardPlan(xusd.address, "200000"); // 0.2e6
-        // await rewardDistrubution.notifyRewardAmount(xusd.address, "1000000000"); // 1000e6
+    await mcb.connect(user1).approve(xmcb.address, toWei("2000000"));
+    await xmcb.connect(user1).deposit(toWei("200000"));
 
-        await governor.connect(user1).propose(
-            [xmcb.address, rewardDistrubution.address, rewardDistrubution.address],
-            [0, 0, 0],
-            [
-                "addComponent(address)",
-                "createRewardPlan(address,uint256)",
-                "notifyRewardAmount(address,uint256)"],
-            [
-                ethers.utils.defaultAbiCoder.encode(["address"], [rewardDistrubution.address]),
-                ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [xusd.address, "200000"]),
-                ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [xusd.address, "1000000000"])
-            ],
-            "add rewardDistrubution"
-        )
-        await governor.skipBlock(1);
-        await governor.connect(user1).castVote(1, true)
-        await governor.connect(user2).castVote(1, false)
-        var result = await governor.getReceipt(1, user1.address)
-        expect(result.hasVoted).to.be.true
-        expect(result.support).to.be.true
-        expect(result.votes).to.equal(toWei("75"))
-        var result = await governor.getReceipt(1, user2.address)
-        expect(result.hasVoted).to.be.true
-        expect(result.support).to.be.false
-        expect(result.votes).to.equal(toWei("25"))
+    await tm.skipBlock(3);
+    await governor
+      .connect(user1)
+      .propose(
+        [mcbMinter.address],
+        [0],
+        ["mintFromBase(address,uint256)"],
+        [ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [user2.address, toWei("1000")])],
+        "base mint to user0"
+      );
 
-        // some magic ...
-        await governor.skipBlock(17280);
-        await governor.queue(1);
-        await timelock.skipTime(86400);
-        await governor.execute(1);
+    await tm.skipBlock(2);
+    await governor.connect(user1).castVote(23, true);
 
-        // now it is there, the mining should start
-        expect(await xmcb.isComponent(rewardDistrubution.address)).to.be.true
+    await tm.skipBlock(17280);
+    expect(await governor.state(23)).to.equal(ProposalState.Succeeded);
 
-        // after 10 blocks
-        await rewardDistrubution.skipBlock(10);
-        expect(await rewardDistrubution.earned(xusd.address, user1.address)).to.equal("1500000")
-        expect(await rewardDistrubution.earned(xusd.address, user2.address)).to.equal("500000")
-    });
-})
+    await governor.queue(23);
+    await tm.skipTime(86400);
+
+    console.log(fromWei((await mcbMinter.callStatic.getMintableAmounts())[0]));
+    await governor.execute(23);
+    expect(await mcb.balanceOf(user2.address)).to.equal(toWei("750"));
+    expect(await mcb.balanceOf(developer.address)).to.equal(toWei("250"));
+    console.log(fromWei((await mcbMinter.callStatic.getMintableAmounts())[0]));
+  });
+
+  it("initiate usdc farming", async () => {
+    await authenticator.grantRole(ethers.utils.id("VALUE_CAPTURE_ADMIN_ROLE"), user2.address);
+
+    const usdc = await deployer.deploy("CustomERC20", "USDC", "USDC", 6);
+    await usdc.mint(vault.address, toWei("20000"));
+
+    await tm.turnOn();
+    await tm.setBlockNumber(801000);
+
+    await mcb.connect(user1).approve(xmcb.address, toWei("2000000"));
+    await xmcb.connect(user1).deposit(toWei("200000"));
+
+    await tm.skipBlock(3);
+    await governor
+      .connect(user1)
+      .propose(
+        [rewardDistribution.address, rewardDistribution.address, vault.address],
+        [0, 0, 0],
+        [
+          "createRewardPlan(address,uint256)",
+          "notifyRewardAmount(address,uint256)",
+          "transferERC20(address,address,uint256)",
+        ],
+        [
+          ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [usdc.address, toWei("0.2")]),
+          ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [usdc.address, toWei("20000")]),
+          ethers.utils.defaultAbiCoder.encode(
+            ["address", "address", "uint256"],
+            [usdc.address, rewardDistribution.address, toWei("20000")]
+          ),
+        ],
+        "usdc farming"
+      );
+
+    await tm.skipBlock(2);
+    await governor.connect(user1).castVote(23, true);
+
+    await tm.skipBlock(17280);
+    expect(await governor.state(23)).to.equal(ProposalState.Succeeded);
+
+    await governor.queue(23);
+    await tm.skipTime(86400);
+
+    await governor.execute(23);
+
+    await tm.skipBlock("100");
+    console.log(fromWei(await rewardDistribution.earned(usdc.address, user1.address)));
+
+    await rewardDistribution.connect(user1).getAllRewards();
+    console.log(fromWei(await rewardDistribution.earned(usdc.address, user1.address)));
+  });
+});

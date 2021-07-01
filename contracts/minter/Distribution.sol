@@ -9,6 +9,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import { Config } from "./Config.sol";
 import { Context } from "./Context.sol";
 
+import "hardhat/console.sol";
+
 /**
  * @dev Define how the MCB will be distributed among DAO controlled part and vesting part.
  */
@@ -82,10 +84,9 @@ abstract contract Distribution is Initializable, Context, Config {
      *      When access from external, call update before try to get the real amount.
      */
     function _baseMintableAmount() internal view returns (uint256) {
-        uint256 remainingAmount =
-            baseMintState.maxSupply > baseMintState.mintedAmount
-                ? uint256(baseMintState.maxSupply).sub(baseMintState.mintedAmount)
-                : 0;
+        uint256 remainingAmount = baseMintState.maxSupply > baseMintState.mintedAmount
+            ? uint256(baseMintState.maxSupply).sub(baseMintState.mintedAmount)
+            : 0;
         return extraMintableAmount.add(baseMintState.mintableAmount).min(remainingAmount);
     }
 
@@ -96,10 +97,9 @@ abstract contract Distribution is Initializable, Context, Config {
     function _roundMintableAmount(uint256 index) internal view returns (uint256) {
         require(index < roundMintStates.length, "round not exists");
         Round storage round = roundMintStates[index];
-        uint256 remainingAmount =
-            round.maxSupply > round.mintedAmount
-                ? uint256(round.maxSupply).sub(round.mintedAmount)
-                : 0;
+        uint256 remainingAmount = round.maxSupply > round.mintedAmount
+            ? uint256(round.maxSupply).sub(round.mintedAmount)
+            : 0;
         return uint256(round.mintableAmount).min(remainingAmount);
     }
 
@@ -117,15 +117,14 @@ abstract contract Distribution is Initializable, Context, Config {
         require(startBlock > _blockNumber(), "startBlock should be later than current");
 
         uint256 index = roundMintStates.length;
-        Round memory newRound =
-            Round({
-                recipient: recipient,
-                maxSupply: maxSupply,
-                rateLimitPerBlock: rateLimitPerBlock,
-                mintableAmount: 0,
-                lastUpdateBlock: startBlock,
-                mintedAmount: 0
-            });
+        Round memory newRound = Round({
+            recipient: recipient,
+            maxSupply: maxSupply,
+            rateLimitPerBlock: rateLimitPerBlock,
+            mintableAmount: 0,
+            lastUpdateBlock: startBlock,
+            mintedAmount: 0
+        });
         roundMintStates.push(newRound);
         baseMintState.maxSupply = _safe128(uint256(baseMintState.maxSupply).sub(maxSupply));
         emit NewRound(index, maxSupply, rateLimitPerBlock, startBlock);
@@ -142,9 +141,12 @@ abstract contract Distribution is Initializable, Context, Config {
         if (elapsedBlock == 0) {
             return false;
         }
+
         uint256 minMintableAmount = elapsedBlock.mul(baseMintState.rateLimitPerBlock);
-        uint256 incrementalCapturedValue =
-            capturedValue.sub(lastCapturedValue, "captured value can not decrease");
+        uint256 incrementalCapturedValue = capturedValue.sub(
+            lastCapturedValue,
+            "captured value can not decrease"
+        );
         bool hasCapturedValue = incrementalCapturedValue > minMintableAmount;
         if (hasCapturedValue) {
             extraMintableAmount = extraMintableAmount.add(
@@ -214,15 +216,16 @@ abstract contract Distribution is Initializable, Context, Config {
         if (elapsedBlock == 0) {
             return mintableAmount;
         }
-        uint256 remainSupply =
-            uint256(round.maxSupply).sub(round.mintedAmount).sub(round.mintableAmount);
+        uint256 remainSupply = uint256(round.maxSupply).sub(round.mintedAmount).sub(
+            round.mintableAmount
+        );
         if (remainSupply == 0) {
             return mintableAmount;
         }
         mintableAmount = elapsedBlock.mul(round.rateLimitPerBlock).min(extraMintableAmount).min(
             remainSupply
         );
-        // substract from extra, add to series-X round
+        // minus from extra, add to series-X round
         extraMintableAmount = extraMintableAmount.sub(mintableAmount);
         // update amount && block
         round.mintableAmount = _safe128(mintableAmount.add(round.mintableAmount));

@@ -149,7 +149,7 @@ contract Comp is Initializable, ContextUpgradeable, IComp {
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "XMCB::delegateBySig: invalid signature");
         require(nonce == nonces[signatory]++, "XMCB::delegateBySig: invalid nonce");
-        require(block.timestamp <= expiry, "XMCB::delegateBySig: signature expired");
+        require(getBlockTimestamp() <= expiry, "XMCB::delegateBySig: signature expired");
         return _delegate(signatory, delegatee);
     }
 
@@ -176,7 +176,7 @@ contract Comp is Initializable, ContextUpgradeable, IComp {
         override
         returns (uint96)
     {
-        require(blockNumber < block.number, "XMCB::getPriorVotes: not yet determined");
+        require(blockNumber < getBlockNumber(), "XMCB::getPriorVotes: not yet determined");
 
         uint32 nCheckpoints = numCheckpoints[account];
         if (nCheckpoints == 0) {
@@ -261,7 +261,7 @@ contract Comp is Initializable, ContextUpgradeable, IComp {
         uint96 newVotes
     ) internal {
         uint32 blockNumber = safe32(
-            block.number,
+            getBlockNumber(),
             "XMCB::_writeCheckpoint: block number exceeds 32 bits"
         );
 
@@ -310,6 +310,14 @@ contract Comp is Initializable, ContextUpgradeable, IComp {
             chainId := chainid()
         }
         return chainId;
+    }
+
+    function getBlockNumber() internal view virtual returns (uint256) {
+        return block.number;
+    }
+
+    function getBlockTimestamp() internal view virtual returns (uint256) {
+        return block.timestamp;
     }
 
     bytes32[50] private __gap;

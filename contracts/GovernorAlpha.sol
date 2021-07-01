@@ -8,6 +8,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import { IComp } from "./interfaces/IComp.sol";
 import { ITimelock } from "./interfaces/ITimelock.sol";
 
+import "hardhat/console.sol";
+
 contract GovernorAlpha is Initializable {
     /// @notice The name of this contract
     string public constant name = "MCDEX DAO Governor";
@@ -278,6 +280,7 @@ contract GovernorAlpha is Initializable {
         Proposal storage proposal = proposals[proposalId];
         proposal.executed = true;
         for (uint256 i = 0; i < proposal.targets.length; i++) {
+            console.log("action %s", i);
             timelock.executeTransaction{ value: proposal.values[i] }(
                 proposal.targets[i],
                 proposal.values[i],

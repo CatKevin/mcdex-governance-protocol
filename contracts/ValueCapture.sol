@@ -52,6 +52,11 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable, IValueCaptur
     event ForwardERC20Token(address indexed tokenOut, uint256 amount);
     event ForwardERC721Token(address indexed tokenOut, uint256 tokenID);
     event SetMiner(address indexed oldMinter, address indexed newMinter);
+    event SendValueCaptureNotification(
+        address indexed recipient,
+        uint256 totalCapturedUSD,
+        uint256 lastCapturedBlock
+    );
 
     receive() external payable {}
 
@@ -193,7 +198,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable, IValueCaptur
         for ((uint256 i, uint256 count) = (0, tokens.length); i < count; i++) {
             _forwardAsset(tokens[i], amountsIn[i]);
         }
-        tryNotifyCapturedValue();
+        sendCaptureNotification();
     }
 
     /**
@@ -241,6 +246,24 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable, IValueCaptur
         emit ForwardERC721Token(token, tokenID);
     }
 
+    /**
+     * @notice Try send a notification to recipient.
+     */
+    function sendCaptureNotification() public onlyAuthorized {
+        if (!captureNotifyRecipient.isContract()) {
+            return;
+        }
+        ICaptureNotifyRecipient(captureNotifyRecipient).onValueCaptured(
+            totalCapturedUSD,
+            lastCapturedBlock
+        );
+        emit SendValueCaptureNotification(
+            captureNotifyRecipient,
+            totalCapturedUSD,
+            lastCapturedBlock
+        );
+    }
+
     function _forwardAsset(address token, uint256 amountIn) internal {
         require(vault != address(0), "vault is not set");
         require(amountIn != 0, "amount in is zero");
@@ -255,7 +278,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable, IValueCaptur
 
         uint256 normalizeAmountOut = amountOut.mul(normalizer);
         totalCapturedUSD = totalCapturedUSD.add(normalizeAmountOut);
-        lastCapturedBlock = _getBlockNumber();
+        lastCapturedBlock = _blockNumber();
 
         IERC20Upgradeable(tokenOut).safeTransfer(vault, amountOut);
 
@@ -288,20 +311,8 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable, IValueCaptur
         emit ExchangeToken(tokenIn, amountIn, tokenOut, amountOut);
     }
 
-    function _getBlockNumber() internal view virtual returns (uint256) {
+    function _blockNumber() internal view virtual returns (uint256) {
         return block.number;
-    }
-
-    function tryNotifyCapturedValue() public onlyAuthorized {
-        if (!captureNotifyRecipient.isContract()) {
-            return;
-        }
-        try
-            ICaptureNotifyRecipient(captureNotifyRecipient).onValueCaptured(
-                totalCapturedUSD,
-                lastCapturedBlock
-            )
-        {} catch {}
     }
 
     bytes32[50] private __gap;
