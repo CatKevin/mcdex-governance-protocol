@@ -9,8 +9,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import { Config } from "./Config.sol";
 import { Context } from "./Context.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @dev Define how the MCB will be distributed among DAO controlled part and vesting part.
  */
