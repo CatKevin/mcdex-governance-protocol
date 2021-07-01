@@ -128,9 +128,10 @@ contract MCBMinter is
      *          This method need no authentication to be called.
      *          So the beneficiary is able to call at any time to release the vesting tokens.
      */
-    function mintFromRound(uint256 index, uint256 amount) external {
-        updateMintableAmount();
+    function mintFromRound(uint256 index) external {
+        _updateMintableAmount();
         address recipient = _roundRecipient(index);
+        uint256 amount = _roundMintableAmount(index);
         _releaseFromRound(index, amount);
         _mint(recipient, amount);
         emit RoundMint(index, recipient, amount);

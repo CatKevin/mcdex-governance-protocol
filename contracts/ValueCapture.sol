@@ -68,6 +68,11 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable, IValueCaptur
         _;
     }
 
+    modifier onlyAdmin() {
+        require(authenticator.hasRoleOrAdmin(0, msg.sender), "caller is not admin");
+        _;
+    }
+
     function getCapturedValue() external view override returns (uint256, uint256) {
         return (totalCapturedUSD, lastCapturedBlock);
     }
@@ -92,7 +97,7 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable, IValueCaptur
     /**
      * @notice Set receiver of value captured events.
      */
-    function setCaptureNotifyRecipient(address newRecipient) external override onlyAuthorized {
+    function setCaptureNotifyRecipient(address newRecipient) external override onlyAdmin {
         require(newRecipient != captureNotifyRecipient, "newRecipient is already set");
         emit SetMiner(captureNotifyRecipient, newRecipient);
         captureNotifyRecipient = newRecipient;
