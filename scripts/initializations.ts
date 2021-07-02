@@ -50,8 +50,7 @@ export async function startMining(deployer, accounts) {
 }
 
 export async function initialize(deployer, accounts) {
-  const developer = accounts[0];
-  const admin = accounts[0];
+  const guardian = "0x25c646AdF184051B35A405B9aaEBA321E8d5342a";
 
   const mcb = await deployer.getDeployedContract("MCB");
   const authenticator = await deployer.getDeployedContract("Authenticator");
@@ -60,19 +59,20 @@ export async function initialize(deployer, accounts) {
   const valueCapture = await deployer.getDeployedContract("ValueCapture");
   const mcbMinter = await deployer.getDeployedContract("MCBMinter");
   const timelock = await deployer.getDeployedContract("Timelock");
-  const governor = await deployer.getDeployedContract("FastGovernorAlpha");
-  const rewardDistribution = await deployer.getDeployedContract("rewardDistribution");
+  const governor = await deployer.getDeployedContract("GovernorAlpha");
+  const rewardDistribution = await deployer.getDeployedContract("RewardDistribution");
 
   await ensureFinished(authenticator.initialize());
   printInfo("authenticator initialization done");
 
-  await ensureFinished(xmcb.initialize(authenticator.address, mcb.address, toWei("0.05")));
+  await ensureFinished(xmcb.initialize(authenticator.address, mcb.address, toWei("0")));
   printInfo("xmcb initialization done");
 
   await ensureFinished(vault.initialize(authenticator.address));
   printInfo("vault initialization done");
 
   await ensureFinished(valueCapture.initialize(authenticator.address, vault.address));
+  await ensureFinished(valueCapture.setCaptureNotifyRecipient(mcbMinter.address));
   printInfo("valueCapture initialization done");
 
   await ensureFinished(rewardDistribution.initialize(authenticator.address, xmcb.address));
@@ -82,33 +82,29 @@ export async function initialize(deployer, accounts) {
     mcbMinter.initialize(
       authenticator.address,
       mcb.address,
-      developer.address,
-      8506173,
-      "1100001000000000000000000", // 1100001000000000000000000 L1 + L2
-      toWei("0.2")
+      "0xCAb0D7A26dC9E6924EF89aa12e82bb1cC90a2da5",
+      12344945,
+      "2193176548671886899345095", // 1100001000000000000000000 L1 + L2
+      "200000000000000000"
     )
   );
-
-  // const bn = await blockNumber()
+  console.log("MCBVesting =>", deployer.addressOf("MCBVesting"));
   await ensureFinished(
-    mcbMinter.newRound(deployer.addressOf("MCBVesting"), toWei("700000"), toWei("0.55392"), 8812559)
+    mcbMinter.newRound(deployer.addressOf("MCBVesting"), "933334000000000000000000", "861520000000000000", 12742351)
   );
   printInfo("mcbMinter initialization done");
 
-  await ensureFinished(
-    timelock.initialize(
-      governor.address,
-      300 // 300s for test
-    )
-  );
-  await ensureFinished(governor.initialize(mcb.address, timelock.address, xmcb.address, admin.address, 23));
+  await ensureFinished(timelock.initialize(governor.address, 172800));
+  await ensureFinished(governor.initialize(mcb.address, timelock.address, xmcb.address, guardian, 31));
 
   // roles
   const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000";
   await ensureFinished(authenticator.grantRole(DEFAULT_ADMIN_ROLE, timelock.address));
   printInfo("timelock && governor initialization done");
+
   await ensureFinished(authenticator.grantRole(ethers.utils.id("VALUE_CAPTURE_ROLE"), valueCapture.address));
   printInfo("MCB MINTER_ROLE initialization done");
+
   //   await ensureFinished(authenticator.grantRole(ethers.utils.id("MINTER_ROLE"), timelock.address));
   //   printInfo("MCB MINTER_ROLE initialization done");
 }

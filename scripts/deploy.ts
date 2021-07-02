@@ -1,36 +1,36 @@
 const hre = require("hardhat");
-const ethers = hre.ethers
+const ethers = hre.ethers;
 
-import { DeploymentOptions } from './deployer/deployer'
-import { restorableEnviron } from './deployer/environ'
-import { printError } from './deployer/utils'
+import { DeploymentOptions } from "./deployer/deployer";
+import { restorableEnviron } from "./deployer/environ";
+import { printError } from "./deployer/utils";
 
 const ENV: DeploymentOptions = {
-    network: hre.network.name,
-    artifactDirectory: './artifacts/contracts',
-    addressOverride: {
-        // arb-rinkeby
-        "MCBVesting": "0x49FCebBc49Fc617b901E4086dEfB8Cc016a4BD17",
-        "ProxyAdmin": "0xA712f0D80Fc1066a73649D004e3E0D92150ae1f6",
-    }
-}
+  network: hre.network.name,
+  artifactDirectory: "./artifacts/contracts",
+  addressOverride: {
+    // arb-rinkeby
+    MCB: "0x4e352cF164E64ADCBad318C3a1e222E9EBa4Ce42",
+    MCBVesting: "0x80EefA1DEd44f08e2DaCFab07B612bE66363326e",
+    ProxyAdmin: "0x93a9182883C1019e1dBEbB5d40C140e7680cd151",
+  },
+};
 
-import { deploy } from "./deployments"
-import { initialize, startMining } from "./initializations"
+import { deploy } from "./deployments";
+import { initialize, startMining } from "./initializations";
 
 async function main(deployer, accounts) {
-
-    await deployer.deployOrSkip("MCB", "fakeMCB", "fakeMCB", 18);
-
-    await deploy(deployer, accounts);
-    await initialize(deployer, accounts);
-    // await startMining(deployer, accounts)
+  // 1. deploy
+  // await deploy(deployer, accounts);
+  await initialize(deployer, accounts);
+  // await startMining(deployer, accounts)
 }
 
-ethers.getSigners()
-    .then(accounts => restorableEnviron(ethers, ENV, main, accounts))
-    .then(() => process.exit(0))
-    .catch(error => {
-        printError(error);
-        process.exit(1);
-    });
+ethers
+  .getSigners()
+  .then((accounts) => restorableEnviron(ethers, ENV, main, accounts))
+  .then(() => process.exit(0))
+  .catch((error) => {
+    printError(error);
+    process.exit(1);
+  });
