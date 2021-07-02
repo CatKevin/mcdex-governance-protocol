@@ -10,5 +10,7 @@ interface IMCB is IERC20 {
 
     function decimals() external view returns (uint8);
 
+    function tokenSupplyOnL1() external view returns (uint256);
+
     function mint(address account, uint256 amount) external;
 }

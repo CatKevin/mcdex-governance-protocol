@@ -2,9 +2,9 @@
 pragma solidity 0.7.4;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
+import { IMCB } from "./interfaces/IMCB.sol";
 import { IComp } from "./interfaces/IComp.sol";
 import { ITimelock } from "./interfaces/ITimelock.sol";
 
@@ -46,7 +46,7 @@ contract GovernorAlpha is Initializable {
     IComp public comp;
 
     /// @notice The address of L2 MCB Token.
-    IERC20Upgradeable public mcbToken;
+    IMCB public mcbToken;
 
     /// @notice The address of the Governor Guardian
     address public guardian;
@@ -158,7 +158,7 @@ contract GovernorAlpha is Initializable {
         address guardian_,
         uint256 initialProposalId_
     ) external initializer {
-        mcbToken = IERC20Upgradeable(mcbToken_);
+        mcbToken = IMCB(mcbToken_);
         timelock = ITimelock(timelock_);
         comp = IComp(comp_);
         guardian = guardian_;
@@ -418,6 +418,14 @@ contract GovernorAlpha is Initializable {
         timelock.acceptAdmin();
     }
 
+    function __transferGuardian(address newGuardian) public {
+        require(
+            msg.sender == guardian,
+            "GovernorAlpha::__acceptAdmin: sender must be gov guardian"
+        );
+        guardian = newGuardian;
+    }
+
     function __abdicate() public {
         require(msg.sender == guardian, "GovernorAlpha::__abdicate: sender must be gov guardian");
         guardian = address(0);
@@ -479,7 +487,7 @@ contract GovernorAlpha is Initializable {
     }
 
     function _getMCBTotalSupply() internal view virtual returns (uint256) {
-        return mcbToken.totalSupply();
+        return _add256(mcbToken.totalSupply(), mcbToken.tokenSupplyOnL1());
     }
 
     bytes32[50] private __gap;
