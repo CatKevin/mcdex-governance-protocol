@@ -307,10 +307,9 @@ contract ValueCapture is Initializable, ReentrancyGuardUpgradeable, IValueCaptur
             IUSDConvertor exchange = externalExchanges[tokenIn];
             require(address(exchange).isContract(), "token exchange is not available");
             require(tokenIn == exchange.tokenIn(), "input token mismatch");
-            tokenOut = externalExchanges[tokenIn].tokenOut();
-
+            tokenOut = exchange.tokenOut();
             IERC20Upgradeable(tokenIn).safeIncreaseAllowance(address(exchange), amountIn);
-            amountOut = externalExchanges[tokenIn].exchangeForUSD(amountIn);
+            amountOut = exchange.exchangeForUSD(amountIn);
         }
         require(amountOut > 0, "balance out is 0");
         emit ExchangeToken(tokenIn, amountIn, tokenOut, amountOut);
