@@ -41,16 +41,17 @@ contract UniV3Wrapper is IUSDConvertor {
     }
 
     function exchangeForUSD(uint256 amountIn) external override returns (uint256 amountOut) {
+        SafeERC20.safeTransferFrom(IERC20(tokenIn()), msg.sender, address(this), amountIn);
         SafeERC20.safeApprove(IERC20(tokenIn()), address(uniswapRouter), amountIn);
-        return
-            uniswapRouter.exactInput(
-                ISwapRouter.ExactInputParams(
-                    path,
-                    address(this), // recipient
-                    block.timestamp + 15, // deadline
-                    amountIn,
-                    0 // amountOutMinimum
-                )
-            );
+        amountOut = uniswapRouter.exactInput(
+            ISwapRouter.ExactInputParams(
+                path,
+                msg.sender, // recipient
+                block.timestamp + 15, // deadline
+                amountIn,
+                0 // amountOutMinimum
+            )
+        );
+        require(amountOut > 0, "amountOut is zero");
     }
 }
