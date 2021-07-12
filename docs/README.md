@@ -104,7 +104,7 @@ Any one is able to call `seriesAMint` before reach the mintable limitation.
 
 #### Overview
 
-Authentication is basically the `AccessControl` contract implemented by `OpenZepplin`.It is the central permission management module of all the DAO contracts. Every authentication request is sent to this contract, then been test if an account has granted specific role to call specific function.
+Authentication is basically the `AccessControl` contract implemented by `OpenZepplin`. It is the central permission management module of all the DAO contracts. Every authentication request is sent to this contract, then been test if an account has granted specific role to call specific function.
 
 The `DEFAULT_ADMIN_ROLE` (0x0) role will be set to contract deployer to help to initialize the trust chain of the DAO system and finally will be set to `Timelock` contract after all initialization finished.
 
@@ -370,7 +370,7 @@ The method with prefix 'try' will not revert on error.
 
 ### GovernorAlpha && Timelock
 
-GovernorAlpha and Timelock are also created based on the contracts with the same names from Compound. Most of their functions are just left unchanged.  The GovernorAlpha takes the XMCB token as its voting token.
+GovernorAlpha and Timelock are also created based on the contracts with the same names from Compound. Most of their functions are just left unchanged. The GovernorAlpha takes the XMCB token as its voting token.
 
 #### GovernorAlpha
 
@@ -378,7 +378,7 @@ Changes:
 
 - Code updates according to new solidity compiler version (0.7.4);
 
-- The values of `quorumVotes` and `proposalThreshold`  now use the dynamic amount based on current `totalSupply` of MCB on creating proposal, instead of two fixed amounts.
+- The values of `quorumVotes` and `proposalThreshold` now use the dynamic amount based on current `totalSupply` of MCB on creating proposal, instead of two fixed amounts.
 - Retrieve total supply of MCB from `DataExchange`.
 
 #### Timelock
