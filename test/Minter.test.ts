@@ -365,4 +365,13 @@ describe("Minter", () => {
       true
     );
   });
+
+  it("new rounds", async () => {
+    await tm.setBlockNumber(1); // < 100
+    await minter.newRound(user2.address, toWei("5000000"), toWei("0.5"), 110);
+    await expect(minter.newRound(user2.address, toWei("3000000.1"), toWei("0.5"), 110)).to.be.revertedWith(
+      "insufficient supply for new round"
+    );
+    await minter.newRound(user2.address, toWei("3000000"), toWei("0.5"), 110);
+  });
 });
