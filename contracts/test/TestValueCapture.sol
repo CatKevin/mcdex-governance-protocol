@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL
 pragma solidity 0.7.4;
 
 import "../ValueCapture.sol";
