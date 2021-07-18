@@ -1,0 +1,803 @@
+contracts/components/staking/RewardDistribution.sol:RewardDistribution:
+  - id: 888
+    name: _initialized
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 891
+    name: _initializing
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 12338
+    name: xmcb
+    type: t_contract$_IXMCB_$12315
+    typeName: contract IXMCB
+    visibility: public
+  - id: 12340
+    name: authenticator
+    type: t_contract$_IAuthenticator_$13189
+    typeName: contract IAuthenticator
+    visibility: public
+  - id: 12363
+    name: _rewardPlans
+    type: t_mapping$_t_address_$_t_struct$_RewardPlan_$12359_storage_$
+    typeName: mapping(address => struct RewardDistribution.RewardPlan)
+    visibility: internal
+    keyType: t_address
+    subType:
+      - id: 12342
+        name: rewardToken
+        type: t_contract$_IERC20Upgradeable_$1025
+        typeName: contract IERC20Upgradeable
+        visibility: internal
+      - id: 12344
+        name: periodFinish
+        type: t_uint256
+        typeName: uint256
+        visibility: internal
+      - id: 12346
+        name: rewardRate
+        type: t_uint256
+        typeName: uint256
+        visibility: internal
+      - id: 12348
+        name: lastUpdateTime
+        type: t_uint256
+        typeName: uint256
+        visibility: internal
+      - id: 12350
+        name: rewardPerTokenStored
+        type: t_uint256
+        typeName: uint256
+        visibility: internal
+      - id: 12354
+        name: userRewardPerTokenPaid
+        type: t_mapping$_t_address_$_t_uint256_$
+        typeName: mapping(address => uint256)
+        visibility: internal
+        keyType: t_address
+      - id: 12358
+        name: rewards
+        type: t_mapping$_t_address_$_t_uint256_$
+        typeName: mapping(address => uint256)
+        visibility: internal
+        keyType: t_address
+  - id: 12365
+    name: _activeReward
+    type: t_struct$_AddressSet_$1986_storage
+    typeName: struct EnumerableSetUpgradeable.AddressSet
+    visibility: internal
+    subType:
+      - id: 1985
+        name: _inner
+        type: t_struct$_Set_$1721_storage_ptr
+        typeName: struct EnumerableSetUpgradeable.Set
+        visibility: internal
+        subType:
+          - id: 1716
+            name: _values
+            type: t_array$_t_bytes32_$dyn_storage_ptr
+            typeName: bytes32[]
+            visibility: internal
+          - id: 1720
+            name: _indexes
+            type: t_mapping$_t_bytes32_$_t_uint256_$
+            typeName: mapping(bytes32 => uint256)
+            visibility: internal
+            keyType: t_bytes32
+  - id: 13165
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+contracts/exchange/UniV3Wrapper.sol:UniV3Wrapper:
+  - id: 7791
+    name: path
+    type: t_bytes_storage
+    typeName: bytes
+    visibility: public
+  - id: 7793
+    name: factory
+    type: t_address
+    typeName: address
+    visibility: public
+contracts/exchange/UniV3WrapperFactory.sol:UniV3WrapperFactory:
+  - id: 2551
+    name: _owner
+    type: t_address
+    typeName: address
+    visibility: private
+  - id: 7968
+    name: master
+    type: t_address
+    typeName: address
+    visibility: public
+  - id: 7972
+    name: wrappers
+    type: t_mapping$_t_bytes32_$_t_address_$
+    typeName: mapping(bytes32 => address)
+    visibility: public
+    keyType: t_bytes32
+contracts/minter/MCBMinter.sol:MCBMinter:
+  - id: 888
+    name: _initialized
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 891
+    name: _initializing
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 13540
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+  - id: 13473
+    name: genesisBlock
+    type: t_uint256
+    typeName: uint256
+    visibility: public
+  - id: 13524
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+  - id: 13579
+    name: extraMintableAmount
+    type: t_uint256
+    typeName: uint256
+    visibility: public
+  - id: 13581
+    name: lastCapturedValue
+    type: t_uint256
+    typeName: uint256
+    visibility: public
+  - id: 13583
+    name: lastCapturedBlock
+    type: t_uint256
+    typeName: uint256
+    visibility: public
+  - id: 13585
+    name: baseMintState
+    type: t_struct$_Round_$13577_storage
+    typeName: struct Distribution.Round
+    visibility: public
+    subType:
+      - id: 13566
+        name: recipient
+        type: t_address
+        typeName: address
+        visibility: internal
+      - id: 13568
+        name: maxSupply
+        type: t_uint128
+        typeName: uint128
+        visibility: internal
+      - id: 13570
+        name: rateLimitPerBlock
+        type: t_uint128
+        typeName: uint128
+        visibility: internal
+      - id: 13572
+        name: mintableAmount
+        type: t_uint128
+        typeName: uint128
+        visibility: internal
+      - id: 13574
+        name: lastUpdateBlock
+        type: t_uint128
+        typeName: uint128
+        visibility: internal
+      - id: 13576
+        name: mintedAmount
+        type: t_uint128
+        typeName: uint128
+        visibility: internal
+  - id: 13588
+    name: roundMintStates
+    type: t_array$_t_struct$_Round_$13577_storage_$dyn_storage
+    typeName: struct Distribution.Round[]
+    visibility: public
+    subType:
+      - id: 13566
+        name: recipient
+        type: t_address
+        typeName: address
+        visibility: internal
+      - id: 13568
+        name: maxSupply
+        type: t_uint128
+        typeName: uint128
+        visibility: internal
+      - id: 13570
+        name: rateLimitPerBlock
+        type: t_uint128
+        typeName: uint128
+        visibility: internal
+      - id: 13572
+        name: mintableAmount
+        type: t_uint128
+        typeName: uint128
+        visibility: internal
+      - id: 13574
+        name: lastUpdateBlock
+        type: t_uint128
+        typeName: uint128
+        visibility: internal
+      - id: 13576
+        name: mintedAmount
+        type: t_uint128
+        typeName: uint128
+        visibility: internal
+  - id: 14394
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+  - id: 14770
+    name: mcbToken
+    type: t_contract$_IMCB_$13275
+    typeName: contract IMCB
+    visibility: public
+  - id: 14772
+    name: developer
+    type: t_address
+    typeName: address
+    visibility: public
+  - id: 14941
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+  - id: 2216
+    name: _status
+    type: t_uint256
+    typeName: uint256
+    visibility: private
+  - id: 2259
+    name: __gap
+    type: t_array$_t_uint256_$49_storage
+    typeName: uint256[49]
+    visibility: private
+    length: '49'
+  - id: 14446
+    name: authenticator
+    type: t_contract$_IAuthenticator_$13189
+    typeName: contract IAuthenticator
+    visibility: public
+  - id: 14743
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+contracts/Authenticator.sol:Authenticator:
+  - id: 888
+    name: _initialized
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 891
+    name: _initializing
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 1709
+    name: __gap
+    type: t_array$_t_uint256_$50_storage
+    typeName: uint256[50]
+    visibility: private
+    length: '50'
+  - id: 46
+    name: _roles
+    type: t_mapping$_t_bytes32_$_t_struct$_RoleData_$42_storage_$
+    typeName: mapping(bytes32 => struct AccessControlUpgradeable.RoleData)
+    visibility: private
+    keyType: t_bytes32
+    subType: []
+  - id: 309
+    name: __gap
+    type: t_array$_t_uint256_$49_storage
+    typeName: uint256[49]
+    visibility: private
+    length: '49'
+  - id: 7336
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+contracts/XMCB.sol:XMCB:
+  - id: 888
+    name: _initialized
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 891
+    name: _initializing
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 2216
+    name: _status
+    type: t_uint256
+    typeName: uint256
+    visibility: private
+  - id: 2259
+    name: __gap
+    type: t_array$_t_uint256_$49_storage
+    typeName: uint256[49]
+    visibility: private
+    length: '49'
+  - id: 1709
+    name: __gap
+    type: t_array$_t_uint256_$50_storage
+    typeName: uint256[50]
+    visibility: private
+    length: '50'
+  - id: 7647
+    name: _totalSupply
+    type: t_uint96
+    typeName: uint96
+    visibility: internal
+  - id: 7651
+    name: _balances
+    type: t_mapping$_t_address_$_t_uint96_$
+    typeName: mapping(address => uint96)
+    visibility: internal
+    keyType: t_address
+  - id: 7656
+    name: delegates
+    type: t_mapping$_t_address_$_t_address_$
+    typeName: mapping(address => address)
+    visibility: public
+    keyType: t_address
+  - id: 7668
+    name: checkpoints
+    type: >-
+      t_mapping$_t_address_$_t_mapping$_t_uint32_$_t_struct$_Checkpoint_$7661_storage_$_$
+    typeName: mapping(address => mapping(uint32 => struct Comp.Checkpoint))
+    visibility: public
+    keyType: t_address
+  - id: 7673
+    name: numCheckpoints
+    type: t_mapping$_t_address_$_t_uint32_$
+    typeName: mapping(address => uint32)
+    visibility: public
+    keyType: t_address
+  - id: 7690
+    name: nonces
+    type: t_mapping$_t_address_$_t_uint256_$
+    typeName: mapping(address => uint256)
+    visibility: public
+    keyType: t_address
+  - id: 8467
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+  - id: 7354
+    name: _components
+    type: t_struct$_AddressSet_$1986_storage
+    typeName: struct EnumerableSetUpgradeable.AddressSet
+    visibility: internal
+    subType:
+      - id: 1985
+        name: _inner
+        type: t_struct$_Set_$1721_storage_ptr
+        typeName: struct EnumerableSetUpgradeable.Set
+        visibility: internal
+        subType:
+          - id: 1716
+            name: _values
+            type: t_array$_t_bytes32_$dyn_storage_ptr
+            typeName: bytes32[]
+            visibility: internal
+          - id: 1720
+            name: _indexes
+            type: t_mapping$_t_bytes32_$_t_uint256_$
+            typeName: mapping(bytes32 => uint256)
+            visibility: internal
+            keyType: t_bytes32
+  - id: 7619
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+  - id: 11760
+    name: authenticator
+    type: t_contract$_IAuthenticator_$13189
+    typeName: contract IAuthenticator
+    visibility: public
+  - id: 11762
+    name: rawToken
+    type: t_contract$_IERC20Upgradeable_$1025
+    typeName: contract IERC20Upgradeable
+    visibility: public
+  - id: 11764
+    name: withdrawalPenaltyRate
+    type: t_uint256
+    typeName: uint256
+    visibility: public
+  - id: 11766
+    name: _rawTotalSupply
+    type: t_uint96
+    typeName: uint96
+    visibility: internal
+  - id: 12289
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+contracts/ValueCapture.sol:ValueCapture:
+  - id: 888
+    name: _initialized
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 891
+    name: _initializing
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 2216
+    name: _status
+    type: t_uint256
+    typeName: uint256
+    visibility: private
+  - id: 2259
+    name: __gap
+    type: t_array$_t_uint256_$49_storage
+    typeName: uint256[49]
+    visibility: private
+    length: '49'
+  - id: 10586
+    name: authenticator
+    type: t_contract$_IAuthenticator_$13189
+    typeName: contract IAuthenticator
+    visibility: public
+  - id: 10588
+    name: vault
+    type: t_address
+    typeName: address
+    visibility: public
+  - id: 10590
+    name: captureNotifyRecipient
+    type: t_address
+    typeName: address
+    visibility: public
+  - id: 10593
+    name: totalCapturedUSD
+    type: t_uint256
+    typeName: uint256
+    visibility: public
+  - id: 10596
+    name: lastCapturedBlock
+    type: t_uint256
+    typeName: uint256
+    visibility: public
+  - id: 10598
+    name: _usdTokenList
+    type: t_struct$_AddressSet_$1986_storage
+    typeName: struct EnumerableSetUpgradeable.AddressSet
+    visibility: internal
+    subType:
+      - id: 1985
+        name: _inner
+        type: t_struct$_Set_$1721_storage_ptr
+        typeName: struct EnumerableSetUpgradeable.Set
+        visibility: internal
+        subType:
+          - id: 1716
+            name: _values
+            type: t_array$_t_bytes32_$dyn_storage_ptr
+            typeName: bytes32[]
+            visibility: internal
+          - id: 1720
+            name: _indexes
+            type: t_mapping$_t_bytes32_$_t_uint256_$
+            typeName: mapping(bytes32 => uint256)
+            visibility: internal
+            keyType: t_bytes32
+  - id: 10602
+    name: normalizers
+    type: t_mapping$_t_address_$_t_uint256_$
+    typeName: mapping(address => uint256)
+    visibility: public
+    keyType: t_address
+  - id: 10606
+    name: externalExchanges
+    type: t_mapping$_t_address_$_t_contract$_IUSDConvertor_$13361_$
+    typeName: mapping(address => contract IUSDConvertor)
+    visibility: public
+    keyType: t_address
+  - id: 11445
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+contracts/Vault.sol:Vault:
+  - id: 888
+    name: _initialized
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 891
+    name: _initializing
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 1286
+    name: __gap
+    type: t_array$_t_uint256_$50_storage
+    typeName: uint256[50]
+    visibility: private
+    length: '50'
+  - id: 2216
+    name: _status
+    type: t_uint256
+    typeName: uint256
+    visibility: private
+  - id: 2259
+    name: __gap
+    type: t_array$_t_uint256_$49_storage
+    typeName: uint256[49]
+    visibility: private
+    length: '49'
+  - id: 11476
+    name: authenticator
+    type: t_contract$_IAuthenticator_$13189
+    typeName: contract IAuthenticator
+    visibility: public
+  - id: 11719
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+contracts/Timelock.sol:Timelock:
+  - id: 888
+    name: _initialized
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 891
+    name: _initializing
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 10142
+    name: admin
+    type: t_address
+    typeName: address
+    visibility: public
+  - id: 10144
+    name: pendingAdmin
+    type: t_address
+    typeName: address
+    visibility: public
+  - id: 10147
+    name: delay
+    type: t_uint256
+    typeName: uint256
+    visibility: public
+  - id: 10152
+    name: queuedTransactions
+    type: t_mapping$_t_bytes32_$_t_bool_$
+    typeName: mapping(bytes32 => bool)
+    visibility: public
+    keyType: t_bytes32
+  - id: 10533
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+contracts/GovernorAlpha.sol:GovernorAlpha:
+  - id: 888
+    name: _initialized
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 891
+    name: _initializing
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 8796
+    name: timelock
+    type: t_contract$_ITimelock_$13341
+    typeName: contract ITimelock
+    visibility: public
+  - id: 8799
+    name: comp
+    type: t_contract$_IComp_$13213
+    typeName: contract IComp
+    visibility: public
+  - id: 8802
+    name: mcbToken
+    type: t_contract$_IMCB_$13275
+    typeName: contract IMCB
+    visibility: public
+  - id: 8805
+    name: guardian
+    type: t_address
+    typeName: address
+    visibility: public
+  - id: 8863
+    name: proposals
+    type: t_mapping$_t_uint256_$_t_struct$_Proposal_$8842_storage_$
+    typeName: mapping(uint256 => struct GovernorAlpha.Proposal)
+    visibility: public
+    keyType: t_uint256
+    subType:
+      - id: 8807
+        name: id
+        type: t_uint256
+        typeName: uint256
+        visibility: internal
+      - id: 8809
+        name: proposer
+        type: t_address
+        typeName: address
+        visibility: internal
+      - id: 8811
+        name: eta
+        type: t_uint256
+        typeName: uint256
+        visibility: internal
+      - id: 8814
+        name: targets
+        type: t_array$_t_address_$dyn_storage_ptr
+        typeName: address[]
+        visibility: internal
+      - id: 8817
+        name: values
+        type: t_array$_t_uint256_$dyn_storage_ptr
+        typeName: uint256[]
+        visibility: internal
+      - id: 8820
+        name: signatures
+        type: t_array$_t_string_storage_$dyn_storage_ptr
+        typeName: string[]
+        visibility: internal
+      - id: 8823
+        name: calldatas
+        type: t_array$_t_bytes_storage_$dyn_storage_ptr
+        typeName: bytes[]
+        visibility: internal
+      - id: 8825
+        name: startBlock
+        type: t_uint256
+        typeName: uint256
+        visibility: internal
+      - id: 8827
+        name: endBlock
+        type: t_uint256
+        typeName: uint256
+        visibility: internal
+      - id: 8829
+        name: forVotes
+        type: t_uint256
+        typeName: uint256
+        visibility: internal
+      - id: 8831
+        name: againstVotes
+        type: t_uint256
+        typeName: uint256
+        visibility: internal
+      - id: 8833
+        name: quorumVotes
+        type: t_uint256
+        typeName: uint256
+        visibility: internal
+      - id: 8835
+        name: canceled
+        type: t_bool
+        typeName: bool
+        visibility: internal
+      - id: 8837
+        name: executed
+        type: t_bool
+        typeName: bool
+        visibility: internal
+      - id: 8841
+        name: receipts
+        type: t_mapping$_t_address_$_t_struct$_Receipt_$8849_storage_$
+        typeName: mapping(address => struct GovernorAlpha.Receipt)
+        visibility: internal
+        keyType: t_address
+        subType:
+          - id: 8844
+            name: hasVoted
+            type: t_bool
+            typeName: bool
+            visibility: internal
+          - id: 8846
+            name: support
+            type: t_bool
+            typeName: bool
+            visibility: internal
+          - id: 8848
+            name: votes
+            type: t_uint96
+            typeName: uint96
+            visibility: internal
+  - id: 8868
+    name: latestProposalIds
+    type: t_mapping$_t_address_$_t_uint256_$
+    typeName: mapping(address => uint256)
+    visibility: public
+    keyType: t_address
+  - id: 8883
+    name: initialProposalId
+    type: t_uint256
+    typeName: uint256
+    visibility: public
+  - id: 8886
+    name: proposalCount
+    type: t_uint256
+    typeName: uint256
+    visibility: public
+  - id: 10058
+    name: __gap
+    type: t_array$_t_bytes32_$50_storage
+    typeName: bytes32[50]
+    visibility: private
+    length: '50'
+contracts/ExecutionProxy.sol:ExecutionProxy:
+  - id: 888
+    name: _initialized
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 891
+    name: _initializing
+    type: t_bool
+    typeName: bool
+    visibility: private
+  - id: 2216
+    name: _status
+    type: t_uint256
+    typeName: uint256
+    visibility: private
+  - id: 2259
+    name: __gap
+    type: t_array$_t_uint256_$49_storage
+    typeName: uint256[49]
+    visibility: private
+    length: '49'
+  - id: 8484
+    name: OPERATOR_ADMIN_ROLE
+    type: t_bytes32
+    typeName: bytes32
+    visibility: public
+  - id: 8486
+    name: authenticator
+    type: t_contract$_IAuthenticator_$13189
+    typeName: contract IAuthenticator
+    visibility: public
+  - id: 8490
+    name: blockedMethods
+    type: t_mapping$_t_bytes4_$_t_bool_$
+    typeName: mapping(bytes4 => bool)
+    visibility: public
+    keyType: t_bytes4
+  - id: 8725
+    name: __gap
+    type: t_array$_t_bytes32_$49_storage
+    typeName: bytes32[49]
+    visibility: private
+    length: '49'

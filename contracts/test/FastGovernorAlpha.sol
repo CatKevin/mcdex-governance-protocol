@@ -10,6 +10,11 @@ contract FastGovernorAlpha is GovernorAlpha {
     uint256 public mockBlockTimestamp;
 
     function votingPeriod() public pure virtual override returns (uint256) {
-        return 300;
+        return 80;
+    }
+
+    function _getMCBTotalSupply() internal view virtual override returns (uint256) {
+        return mcbToken.totalSupply();
     }
 }
+W

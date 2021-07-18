@@ -1,0 +1,12 @@
+contracts:
+  - contracts/components/staking/RewardDistribution.sol:RewardDistribution
+  - contracts/exchange/UniV3Wrapper.sol:UniV3Wrapper
+  - contracts/exchange/UniV3WrapperFactory.sol:UniV3WrapperFactory
+  - contracts/minter/MCBMinter.sol:MCBMinter
+  - contracts/Authenticator.sol:Authenticator
+  - contracts/XMCB.sol:XMCB
+  - contracts/ValueCapture.sol:ValueCapture
+  - contracts/Vault.sol:Vault
+  - contracts/Timelock.sol:Timelock
+  - contracts/GovernorAlpha.sol:GovernorAlpha
+  - contracts/ExecutionProxy.sol:ExecutionProxy
