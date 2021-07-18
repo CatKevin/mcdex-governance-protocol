@@ -165,11 +165,11 @@ contract RewardDistribution is Initializable, IComponent {
             plan.periodFinish = _getBlockNumber();
         } else if (plan.periodFinish != 0) {
             plan.periodFinish = plan
-            .periodFinish
-            .sub(plan.lastUpdateTime)
-            .mul(plan.rewardRate)
-            .div(newRewardRate)
-            .add(_getBlockNumber());
+                .periodFinish
+                .sub(plan.lastUpdateTime)
+                .mul(plan.rewardRate)
+                .div(newRewardRate)
+                .add(_getBlockNumber());
         }
         emit RewardRateChanged(plan.rewardRate, newRewardRate, plan.periodFinish);
         plan.rewardRate = newRewardRate;

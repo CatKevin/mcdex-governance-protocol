@@ -30,7 +30,7 @@ contract MCBMinter is
     bytes32 public constant VALUE_CAPTURE_ROLE = keccak256("VALUE_CAPTURE_ROLE");
 
     IAuthenticator public authenticator;
-W
+
     event BaseMint(address indexed recipient, uint256 amount);
     event RoundMint(uint256 index, address indexed recipient, uint256 amount);
     event OnValueCaptured(uint256 totalCapturedUSD, uint256 lastCapturedBlock);

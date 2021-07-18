@@ -17,4 +17,3 @@ contract FastGovernorAlpha is GovernorAlpha {
         return mcbToken.totalSupply();
     }
 }
-W
