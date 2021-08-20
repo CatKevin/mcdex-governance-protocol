@@ -30,15 +30,15 @@ async function main(deployer, accounts) {
 }
 
 async function mainOnline(deployer, accounts) {
-    const PROXY_ADMIN_ROLE = ethers.utils.id("DAO_OWNED_POOL_OPERATOR_ROLE")
-    await deployer.deployAsUpgradeable("ExecutionProxy", deployer.addressOf("ProxyAdmin"))
-    const authenticator = await deployer.getDeployedContract("Authenticator")
-    await authenticator.initialize()
-    const proxy = await deployer.getDeployedContract("ExecutionProxy")
-    await proxy.initialize(authenticator.address, PROXY_ADMIN_ROLE)
+    const proxy = await deployer.deployAsUpgradeable("OperatorProxy", deployer.addressOf("ProxyAdmin"))
+    await proxy.initialize(deployer.addressOf("Authenticator"))
 
-    await authenticator.grantRole(PROXY_ADMIN_ROLE, "address of proxy admin 1 ...")
-    await authenticator.grantRole(PROXY_ADMIN_ROLE, "address of proxy admin 2 ...")
+    const OPERATOR_ADMIN_ROLE = ethers.utils.id("OPERATOR_ADMIN_ROLE")
+    const OPERATOR_ROLE = ethers.utils.id("OPERATOR_ROLE")
+
+    const authenticator = await deployer.getDeployedContract("Authenticator")
+    await authenticator.grantRole(OPERATOR_ADMIN_ROLE, "address can do any operator options")
+    await authenticator.grantRole(OPERATOR_ROLE, "address can only check in")
 }
 
 ethers.getSigners()
