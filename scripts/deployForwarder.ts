@@ -29,6 +29,18 @@ async function main(deployer, accounts) {
     await authenticator.grantRole(PROXY_ADMIN_ROLE, "0xa2aAD83466241232290bEbcd43dcbFf6A7f8d23a")
 }
 
+async function mainOnline(deployer, accounts) {
+    const PROXY_ADMIN_ROLE = ethers.utils.id("DAO_OWNED_POOL_OPERATOR_ROLE")
+    await deployer.deployAsUpgradeable("ExecutionProxy", deployer.addressOf("ProxyAdmin"))
+    const authenticator = await deployer.getDeployedContract("Authenticator")
+    await authenticator.initialize()
+    const proxy = await deployer.getDeployedContract("ExecutionProxy")
+    await proxy.initialize(authenticator.address, PROXY_ADMIN_ROLE)
+
+    await authenticator.grantRole(PROXY_ADMIN_ROLE, "address of proxy admin 1 ...")
+    await authenticator.grantRole(PROXY_ADMIN_ROLE, "address of proxy admin 2 ...")
+}
+
 ethers.getSigners()
     .then(accounts => restorableEnviron(ethers, ENV, main, accounts))
     .then(() => process.exit(0))

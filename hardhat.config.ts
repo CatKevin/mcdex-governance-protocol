@@ -101,7 +101,7 @@ module.exports = {
     },
     arb1: {
       url: `https://arb1.arbitrum.io/rpc`,
-      gasPrice: 3e8,
+      gasPrice: 5e8,
       blockGasLimit: "80000000",
       accounts: [pk],
     },
