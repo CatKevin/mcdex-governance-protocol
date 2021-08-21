@@ -78,7 +78,6 @@ contract OperatorProxy is Initializable, ReentrancyGuardUpgradeable {
 
     address public maintainer;
 
-    event SetMaintainer(address indexed oldMaintainer, address indexed newMaintainer);
     event WithdrawERC20(address indexed recipient, address indexed token, uint256 amount);
 
     IAuthenticator public authenticator;
@@ -100,11 +99,6 @@ contract OperatorProxy is Initializable, ReentrancyGuardUpgradeable {
         _;
     }
 
-    modifier onlyMaintainer() {
-        require(msg.sender == maintainer, "caller is not authorized");
-        _;
-    }
-
     /**
      * @notice  Initialize vault contract.
      *
@@ -116,13 +110,7 @@ contract OperatorProxy is Initializable, ReentrancyGuardUpgradeable {
         authenticator = IAuthenticator(authenticator_);
     }
 
-    function setMaintainer(address maintainer_) external onlyOperatorAdmin {
-        require(maintainer_ != address(0), "new maintainer is zero address");
-        emit SetMaintainer(maintainer, maintainer_);
-        maintainer = maintainer_;
-    }
-
-    function checkIn(address liquidityPool) external onlyMaintainer {
+    function checkIn(address liquidityPool) external onlyOperatorAdmin {
         ILiquidityPool(liquidityPool).checkIn();
     }
 
@@ -132,44 +120,6 @@ contract OperatorProxy is Initializable, ReentrancyGuardUpgradeable {
 
     function revokeOperator(address liquidityPool) external onlyOperatorAdmin {
         ILiquidityPool(liquidityPool).revokeOperator();
-    }
-
-    function setLiquidityPoolParameter(address liquidityPool, int256[2] calldata params)
-        external
-        onlyOperatorAdmin
-    {
-        ILiquidityPool(liquidityPool).setLiquidityPoolParameter(params);
-    }
-
-    function setOracle(
-        address liquidityPool,
-        uint256 perpetualIndex,
-        address oracle
-    ) external onlyOperatorAdmin {
-        ILiquidityPool(liquidityPool).setOracle(perpetualIndex, oracle);
-    }
-
-    function setPerpetualBaseParameter(
-        address liquidityPool,
-        uint256 perpetualIndex,
-        int256[9] calldata baseParams
-    ) external onlyOperatorAdmin {
-        ILiquidityPool(liquidityPool).setPerpetualBaseParameter(perpetualIndex, baseParams);
-    }
-
-    function setPerpetualRiskParameter(
-        address liquidityPool,
-        uint256 perpetualIndex,
-        int256[8] calldata riskParams,
-        int256[8] calldata minRiskParamValues,
-        int256[8] calldata maxRiskParamValues
-    ) external onlyOperatorAdmin {
-        ILiquidityPool(liquidityPool).setPerpetualRiskParameter(
-            perpetualIndex,
-            riskParams,
-            minRiskParamValues,
-            maxRiskParamValues
-        );
     }
 
     function updatePerpetualRiskParameter(
