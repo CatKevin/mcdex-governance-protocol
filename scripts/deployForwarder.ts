@@ -33,12 +33,9 @@ async function mainOnline(deployer, accounts) {
     const proxy = await deployer.deployAsUpgradeable("OperatorProxy", deployer.addressOf("ProxyAdmin"))
     await proxy.initialize(deployer.addressOf("Authenticator"))
 
-    const OPERATOR_ADMIN_ROLE = ethers.utils.id("OPERATOR_ADMIN_ROLE")
-    const OPERATOR_ROLE = ethers.utils.id("OPERATOR_ROLE")
-
-    const authenticator = await deployer.getDeployedContract("Authenticator")
-    await authenticator.grantRole(OPERATOR_ADMIN_ROLE, "address can do any operator options")
-    await authenticator.grantRole(OPERATOR_ROLE, "address can only check in")
+    // 0x25c 执行
+    // const authenticator = await deployer.getDeployedContract("Authenticator")
+    // await authenticator.grantRole(ethers.utils.id("OPERATOR_ADMIN_ROLE"), "address can do any operator options")
 }
 
 ethers.getSigners()
