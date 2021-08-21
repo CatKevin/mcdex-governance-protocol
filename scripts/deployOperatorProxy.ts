@@ -16,22 +16,16 @@ import { deploy } from "./deployments"
 import { initialize, startMining } from "./initializations"
 
 async function main(deployer, accounts) {
-    await deployer.deploy("ProxyAdmin")
-    const PROXY_ADMIN_ROLE = ethers.utils.id("DAO_OWNED_POOL_OPERATOR_ROLE")
+    await deployer.deployAsUpgradeable("OperatorProxy", "0x02e8735cd053fc738170011F7eBc4117f285fE9D")
 
-    await deployer.deployAsUpgradeable("Authenticator", deployer.addressOf("ProxyAdmin"))
-    await deployer.deployAsUpgradeable("ExecutionProxy", deployer.addressOf("ProxyAdmin"))
-
-    const authenticator = await deployer.getDeployedContract("Authenticator")
-    await authenticator.initialize()
-    const proxy = await deployer.getDeployedContract("ExecutionProxy")
-    await proxy.initialize(authenticator.address, PROXY_ADMIN_ROLE)
-    await authenticator.grantRole(PROXY_ADMIN_ROLE, "0xa2aAD83466241232290bEbcd43dcbFf6A7f8d23a")
+    const proxy = await deployer.getDeployedContract("OperatorProxy")
+    await proxy.initialize()
+    await proxy.addMaintainer("0x02e8735cd053fc738170011F7eBc4117f285fE9D");
+    // await proxy.addMaintainer();
 }
 
 async function mainOnline(deployer, accounts) {
-    const proxy = await deployer.deployAsUpgradeable("OperatorProxy", deployer.addressOf("ProxyAdmin"))
-    await proxy.initialize(deployer.addressOf("Authenticator"))
+
 
     // 0x25c 执行
     // const authenticator = await deployer.getDeployedContract("Authenticator")
