@@ -217,9 +217,9 @@ contract OperatorProxy is Initializable, OwnableUpgradeable {
 
     function propose(
         address liquidityPool,
-        string[] memory signatures,
-        bytes[] memory calldatas,
-        string memory description
+        string[] calldata signatures,
+        bytes[] calldata calldatas,
+        string calldata description
     ) external onlyMaintainer returns (uint256) {
         address lpGovernor = _getLpGovernor(liquidityPool);
         return ILpGovernor(lpGovernor).propose(signatures, calldatas, description);
@@ -228,9 +228,9 @@ contract OperatorProxy is Initializable, OwnableUpgradeable {
     function proposeToUpgradeAndCall(
         address liquidityPool,
         bytes32 targetVersionKey,
-        bytes memory dataForLiquidityPool,
-        bytes memory dataForGovernor,
-        string memory description
+        bytes calldata dataForLiquidityPool,
+        bytes calldata dataForGovernor,
+        string calldata description
     ) external onlyMaintainer returns (uint256) {
         address lpGovernor = _getLpGovernor(liquidityPool);
         return
