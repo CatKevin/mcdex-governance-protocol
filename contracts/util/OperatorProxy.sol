@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL
 pragma solidity 0.7.4;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -32,6 +33,48 @@ interface ILiquidityPool {
     ) external;
 
     function runLiquidityPool() external;
+
+    function getLiquidityPoolInfo()
+        external
+        view
+        returns (
+            bool isRunning,
+            bool isFastCreationEnabled,
+            // [0] creator,
+            // [1] operator,
+            // [2] transferringOperator,
+            // [3] governor,
+            // [4] shareToken,
+            // [5] collateralToken,
+            // [6] vault,
+            address[7] memory addresses,
+            // [0] vaultFeeRate,
+            // [1] poolCash,
+            // [2] insuranceFundCap,
+            // [3] insuranceFund,
+            // [4] donatedInsuranceFund,
+            int256[5] memory intNums,
+            // [0] collateralDecimals,
+            // [1] perpetualCount,
+            // [2] fundingTime,
+            // [3] operatorExpiration,
+            uint256[4] memory uintNums
+        );
+}
+
+interface ILpGovernor {
+    function proposeToUpgradeAndCall(
+        bytes32 targetVersionKey,
+        bytes memory dataForLiquidityPool,
+        bytes memory dataForGovernor,
+        string memory description
+    ) external returns (uint256);
+
+    function propose(
+        string[] memory signatures,
+        bytes[] memory calldatas,
+        string memory description
+    ) external returns (uint256);
 }
 
 interface IAuthenticator {
@@ -108,6 +151,13 @@ contract OperatorProxy is Initializable, OwnableUpgradeable {
         ILiquidityPool(liquidityPool).transferOperator(newOperator);
     }
 
+    function withdrawERC20(address token, uint256 amount) external onlyMaintainer {
+        require(token != address(0), "token is zero address");
+        require(amount != 0, "amount is zero");
+        IERC20Upgradeable(token).safeTransfer(msg.sender, amount);
+        emit WithdrawERC20(msg.sender, token, amount);
+    }
+
     function checkIn(address liquidityPool) external onlyMaintainer {
         ILiquidityPool(liquidityPool).checkIn();
     }
@@ -165,10 +215,36 @@ contract OperatorProxy is Initializable, OwnableUpgradeable {
         ILiquidityPool(liquidityPool).runLiquidityPool();
     }
 
-    function withdrawERC20(address token, uint256 amount) external onlyMaintainer {
-        require(token != address(0), "token is zero address");
-        require(amount != 0, "amount is zero");
-        IERC20Upgradeable(token).safeTransfer(msg.sender, amount);
-        emit WithdrawERC20(msg.sender, token, amount);
+    function propose(
+        address liquidityPool,
+        string[] memory signatures,
+        bytes[] memory calldatas,
+        string memory description
+    ) external onlyMaintainer returns (uint256) {
+        address lpGovernor = _getLpGovernor(liquidityPool);
+        return ILpGovernor(lpGovernor).propose(signatures, calldatas, description);
+    }
+
+    function proposeToUpgradeAndCall(
+        address liquidityPool,
+        bytes32 targetVersionKey,
+        bytes memory dataForLiquidityPool,
+        bytes memory dataForGovernor,
+        string memory description
+    ) external onlyMaintainer returns (uint256) {
+        address lpGovernor = _getLpGovernor(liquidityPool);
+        return
+            ILpGovernor(lpGovernor).proposeToUpgradeAndCall(
+                targetVersionKey,
+                dataForLiquidityPool,
+                dataForGovernor,
+                description
+            );
+    }
+
+    function _getLpGovernor(address liquidityPool) internal view returns (address) {
+        (, , address[7] memory addresses, , ) = ILiquidityPool(liquidityPool)
+            .getLiquidityPoolInfo();
+        return addresses[3];
     }
 }
