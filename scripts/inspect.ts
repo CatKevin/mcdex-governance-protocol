@@ -113,6 +113,19 @@ async function verifyRoles(deployer, accounts) {
     await fetchRoleAccounts(mcb, mcbGranted, roleName, roleValue);
   }
 
+  console.log("Operator Proxy:");
+  console.log("========================");
+  const operatorProxyAddress = "0xE9E60660459428E43abA1c334d1246747f2aa856";
+  const operatorProxy = await deployer.getContractAt("OperatorProxy", operatorProxyAddress);
+  const implementation = await deployer.getImplementation(operatorProxyAddress);
+  console.log("  implementation:", implementation);
+  const upgradeAdmin = await deployer.getAdminOfUpgradableContract(operatorProxyAddress);
+  console.log("  upgradeAdmin:", upgradeAdmin);
+  const owner = await operatorProxy.owner();
+  console.log("  owner:", owner);
+  const maintainers = await operatorProxy.listMaintainers();
+  console.log("  maintainers:", maintainers);
+
   const valueCapture = await deployer.getDeployedContract("ValueCapture");
   const captureNotifyRecipient = await valueCapture.captureNotifyRecipient();
 
