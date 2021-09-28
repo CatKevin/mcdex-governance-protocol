@@ -24,14 +24,6 @@ async function main(deployer, accounts) {
     // await proxy.addMaintainer();
 }
 
-async function mainOnline(deployer, accounts) {
-
-
-    // 0x25c 执行
-    // const authenticator = await deployer.getDeployedContract("Authenticator")
-    // await authenticator.grantRole(ethers.utils.id("OPERATOR_ADMIN_ROLE"), "address can do any operator options")
-}
-
 ethers.getSigners()
     .then(accounts => restorableEnviron(ethers, ENV, main, accounts))
     .then(() => process.exit(0))
