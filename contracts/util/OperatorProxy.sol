@@ -77,6 +77,10 @@ interface ILpGovernor {
     ) external returns (uint256);
 }
 
+interface ITunableOracle {
+    function setFineTuner(address newFineTuner) external;
+}
+
 interface IAuthenticator {
     /**
      * @notice  Check if an account has the given role.
@@ -240,6 +244,13 @@ contract OperatorProxy is Initializable, OwnableUpgradeable {
                 dataForGovernor,
                 description
             );
+    }
+
+    function setFineTuner(
+        address tunableOracle,
+        address newFineTuner
+    ) external onlyMaintainer {
+        ITunableOracle(tunableOracle).setFineTuner(newFineTuner);
     }
 
     function _getLpGovernor(address liquidityPool) internal view returns (address) {
